@@ -1,0 +1,6 @@
+users (
+    id primary key
+    name varchar(32) not null
+    status varchar(32) not null
+    study_group varchar(32) not null
+)
