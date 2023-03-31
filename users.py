@@ -84,10 +84,12 @@ def update_cache(id: int):
         user = database.get_user(id)
     if user is None:
         user = User(id)
+        database.add_user(user)
     activity.push((cur_time, user))
     cache[id] = activity.head
     if activity.size > max_cache_size:
         cur_id = activity.tail.data[1].id
+        database.update_user_info(activity.tail.data[1])
         cache.pop(cur_id)
         activity.pop()
 
