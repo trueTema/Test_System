@@ -1,28 +1,43 @@
 class LinkedList:
     class Node:
         def __init__(self, data, next=None, prev=None):
+            """
+            Initialing constructor
+            :param data: Data for current Node
+            :param next: Pointer to next Node
+            :param prev: Pointer to prev Node
+            """
             self.data = data
             self.next = next
             self.prev = prev
 
     def __init__(self):
+        """Initialing constructor"""
         self.size = 0
         self.head = None
         self.tail = None
 
     def push(self, data):
-        newnode = self.Node(data)
+        """
+        Pushes new Node to the end of List with data
+        :param data: Data for new Node
+        """
+        new_node = self.Node(data)
         self.size += 1
         if self.head is None:
-            self.head = newnode
-            self.tail = newnode
+            self.head = new_node
+            self.tail = new_node
             return
-        newnode.prev = None
-        newnode.next = self.head
-        self.head.prev = newnode
-        self.head = newnode
+        new_node.prev = None
+        new_node.next = self.head
+        self.head.prev = new_node
+        self.head = new_node
 
     def delete(self, item: Node):
+        """
+        Deletes node from List
+        :param item: Deleting node
+        """
         self.size -= 1
         if item != self.head:
             item.prev.next = item.next
@@ -35,6 +50,7 @@ class LinkedList:
         del item
 
     def pop(self):
+        """Deletes node from the front of list"""
         if self.tail == self.head and self.tail is not None:
             cur = self.tail
             self.tail = self.head = None

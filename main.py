@@ -3,13 +3,15 @@ import multiprocessing
 import signal
 import time
 
+import telebot.types
+
 import database
 import users
 import threading
 
 
-#  saving data when process is terminating
-def save_data(signal, frame):
+def save_data(_signal, _frame):
+    """Saves data when the program is going to be closed"""
     cur = users.activity.head
     while cur is not None:
         database.update_user_info(cur.data[1])
@@ -17,6 +19,7 @@ def save_data(signal, frame):
 
 
 def main():
+    """Main function of app"""
     #  initializing variables:
     try:
         with open('config.json', 'r') as file:
@@ -30,10 +33,12 @@ def main():
 
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su']
 
+    #  starting cleaning cache
     th = threading.Thread(target=users.check_cache)
     th.daemon = True
     th.start()
 
+    #  handlers
     @users.bot.message_handler(commands=cmd_list)
     def receive_cmds(message):
         user_id = message.from_user.id
@@ -60,5 +65,5 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, save_data)
     try:
         main()
-    except KeyboardInterrupt as e:
-        print(e)
+    except Exception as e:
+        print(f'[Fatal system error]: {e}')

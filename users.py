@@ -20,12 +20,17 @@ class User:
     _cmd_status = None
 
     def __init__(self, id: int, name='', status: statuses = "student", study_group=None):
+        """Initializing constructor"""
         self.id = id
         self.name = name
         self.status = status
         self.study_group = study_group
 
-    def txt_handler(self, txt):
+    def txt_handler(self, txt: str):
+        """
+        Text messages handler for each user.
+        :param txt: message text
+        """
         if self._cmd_status == "register_r_name":
             self.name = txt
             bot.send_message(self.id, 'Введите учебную группу:')
@@ -38,9 +43,17 @@ class User:
             return
 
     def super_user_cmd(self, cmd):
+        """
+        Super user commands handler
+        :param cmd: command
+        """
         ...
 
     def cmd_handler(self, cmd):
+        """
+        Command handler for each user
+        :param cmd: command
+        """
         if cmd[:3] == 'su ':
             if self.status != 'super_user':
                 bot.send_message(self.id, "Ошибка доступа.")
@@ -64,7 +77,9 @@ class User:
 
 
 activity = LinkedList.LinkedList()
+"""Last recent used cache list"""
 cache = dict()
+"""Last recent used cache hash table"""
 
 max_cache_size = 3  # size of cache
 max_afk_time = 10 * 60  # seconds
@@ -95,15 +110,17 @@ def update_cache(id: int):
 
 
 def test_decor(func):
+    """Decorator that makes infinity cycle for function with pause between iterations"""
     def wrapper():
         while True:
             func()
-            node = activity.head
-            while node is not None:
-                print(node.data[0], node.data[1].id)
-                node = node.next
-            print('-' * 20)
+            #  node = activity.head
+            #  while node is not None:
+            #      print(node.data[0], node.data[1].id)
+            #      node = node.next
+            #  print('-' * 20)
             time.sleep(time_between_checks)
+
     return wrapper
 
 
@@ -113,7 +130,7 @@ def check_cache():
     Removes elements from cache if they have not been used for a long time
     """
     cur_time = time.time()
-    print(cur_time)
+    #  print(cur_time)
     while activity.size and cur_time - activity.tail.data[0] > max_afk_time:
         id = activity.tail.data[1].id
         cache.pop(id)

@@ -3,7 +3,9 @@ import users
 
 
 def add_user(user: users.User):
-    """Adds user into database"""
+    """
+    Adds user into database
+    """
     con = sqlite3.Connection("user_info.sql")
     cur = con.cursor()
     cur.execute(f"INSERT INTO users(id, name, status, study_group) "
