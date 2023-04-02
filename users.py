@@ -42,14 +42,14 @@ class User:
             self._cmd_status = None
             return
 
-    def super_user_cmd(self, cmd):
+    def super_user_cmd(self, cmd: str):
         """
         Super user commands handler
         :param cmd: command
         """
         ...
 
-    def cmd_handler(self, cmd):
+    def cmd_handler(self, cmd: str):
         """
         Command handler for each user
         :param cmd: command
