@@ -4,7 +4,7 @@ from debugpy.common.json import enum
 import database
 import telebot as tgbot
 
-_token = '6003964860:AAHk29MXvsxDCH1BGqOsJbm-W9fMJ64Maxc'
+
 bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
