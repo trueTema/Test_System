@@ -112,7 +112,7 @@ class User:
             bot.send_message(self.id, "Отправка")
             curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
             self.current_number_of_task = curr_num
-            self.current_task.setUserId(curr_num)#Need to add list of id's from DataBase, which was created by admin
+            self.current_task.setUserId(curr_num)#Need to add list of id's from DataBase, which will be created by admin
         if cmd == 'status':
             ...
 
