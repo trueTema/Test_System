@@ -55,6 +55,9 @@ def main():
     @users.bot.message_handler(content_types=['document'])
     def receive_doc(message):
         file_info = users.bot.get_file(message.document.file_id)
+        """
+        Checking and downloading a file
+        """
         if (message.document.file_name[-2:] != "py"):
             users.bot.reply_to(message, "Неправильный формат данных")
             return

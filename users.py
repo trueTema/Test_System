@@ -9,9 +9,10 @@ import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
-from Data import config
 from Task import Task
-bot = tgbot.TeleBot(config.BOT_TOKEN)
+
+_token=""
+bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
 
@@ -42,13 +43,12 @@ class User:
     _cmd_status = None
 
     def __init__(self, id: int, name='', status: statuses = "student",
-                 study_group=None, current_number_of_task=None, current_task=Task):
+                 study_group=None, current_task=Task):
         """Initializing constructor"""
         self.id = id
         self.name = name
         self.status = status
         self.study_group = study_group
-        self.current_number_of_task = current_number_of_task
 
         self.current_task = current_task  # Field of user's task
         self.current_task.Task.setUserId(self.id)
