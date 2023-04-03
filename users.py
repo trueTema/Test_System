@@ -51,7 +51,7 @@ class User:
         self.current_number_of_task = current_number_of_task
 
         self.current_task = current_task  # Field of user's task
-        self.current_task.id_of_user = self.id
+        self.current_task.Task.setUserId(self.id)
 
     def txt_handler(self, txt: str):
         """
@@ -72,6 +72,7 @@ class User:
         if self._cmd_status == "register_r_study_g":
             self.study_group = txt
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
+            self.current_task.Task.setUserId(self.id)
             self._cmd_status = None
             return
 
@@ -112,7 +113,7 @@ class User:
             bot.send_message(self.id, "Отправка")
             curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
             self.current_number_of_task = curr_num
-            self.current_task.setUserId(curr_num)#Need to add list of id's from DataBase, which will be created by admin
+            self.current_task.Task.setUserId(curr_num)#Need to add list of id's from DataBase, which will be created by admin
         if cmd == 'status':
             ...
 

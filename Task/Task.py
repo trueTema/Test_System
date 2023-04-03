@@ -1,12 +1,11 @@
 from debugpy.common.json import enum
 
-statuses_of_task = enum("right", "wrong")#Status of task chanching on conclusion of check-script
 
 class Task:
-    def __init__(self, id: int, status_of_task : statuses_of_task = "wrong",
+    def __init__(self, id: int, cost : float = 0,
                 time_of = None, id_of_user = None):
         self.id = id
-        self.status_of_task = status_of_task
+        self.cost = cost
         self.time_of = time_of
         self.id_of_user = id_of_user
 
@@ -14,7 +13,15 @@ class Task:
         self.id = id
     def setUserId(self,setId):
         self.id_of_user=setId
+    def setCost(self,cost):
+        self.cost = cost
+    def setTime(self,time):
+        self.time_of=time
     def getId(self):
         return self.id
     def getUserId(self):
         return self.id_of_user
+    def getCost(self):
+        return self.cost
+    def getTime(self):
+        return self.time_of
