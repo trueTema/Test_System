@@ -9,3 +9,12 @@ class Task:
         self.status_of_task = status_of_task
         self.time_of = time_of
         self.id_of_user = id_of_user
+
+    def setId(self,id):
+        self.id = id
+    def setUserId(self,setId):
+        self.id_of_user=setId
+    def getId(self):
+        return self.id
+    def getUserId(self):
+        return self.id_of_user
