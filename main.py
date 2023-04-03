@@ -44,7 +44,6 @@ def main():
         connection = users.get_connection(threading.current_thread().native_id)
         users.update_cache(user_id, connection)
         users.cache[user_id].data[1].cmd_handler(cmd)
-
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
         user_id = message.from_user.id
@@ -55,7 +54,16 @@ def main():
 
     @users.bot.message_handler(content_types=['document'])
     def receive_doc(message):
-        ...
+        file_info = users.bot.get_file(message.document.file_id)
+        if (message.document.file_name[-2:] != "py"):
+            users.bot.reply_to(message, "Неправильный формат данных")
+            return
+        download = users.bot.download_file(file_info.file_path)  # This part addes just for testing
+        # For testing on your computer - pass ypi own way
+        src = "C:/Users/georg/Downloads" + message.document.file_name
+        with open(src, "wb") as new_file:
+            new_file.write(download)
+        users.bot.reply_to(message, "Ваш файл был принят")
 
     users.bot.polling(non_stop=True)
 

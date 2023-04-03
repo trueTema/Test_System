@@ -2,13 +2,16 @@ import signal
 import sqlite3
 import threading
 import time
+
+from telebot import types
+
 import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
-
-_token = ''
-bot = tgbot.TeleBot(_token)
+from Data import config
+from Task import Task
+bot = tgbot.TeleBot(config.BOT_TOKEN)
 
 statuses = enum("student", "teacher", "super_user")
 
@@ -38,12 +41,17 @@ def get_connection(thread_id: int) -> sqlite3.Connection:
 class User:
     _cmd_status = None
 
-    def __init__(self, id: int, name='', status: statuses = "student", study_group=None):
+    def __init__(self, id: int, name='', status: statuses = "student",
+                 study_group=None, current_number_of_task=None, current_task=Task):
         """Initializing constructor"""
         self.id = id
         self.name = name
         self.status = status
         self.study_group = study_group
+        self.current_number_of_task = current_number_of_task
+
+        self.current_task = current_task  # Field of user's task
+        self.current_task.id_of_user = self.id
 
     def txt_handler(self, txt: str):
         """
@@ -51,7 +59,13 @@ class User:
         :param txt: message text
         """
         if self._cmd_status == "register_r_name":
-            self.name = txt
+            while True:
+                if len(txt.split(" ")) != 2:
+                    bot.send_message(self.id, 'Неправильный формат Фамилии Имя')
+                    return
+                else:
+                    self.name = txt
+                    break
             bot.send_message(self.id, 'Введите учебную группу:')
             self._cmd_status = "register_r_study_g"
             return
@@ -83,6 +97,8 @@ class User:
             if self.name != '':
                 bot.send_message(self.id, "Вы уже зарегистрированы.")
                 return
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            kb.row(types.KeyboardButton(text="/help"), types.KeyboardButton(text="/status"))
             bot.send_message(self.id, 'Введите Фамилию Имя:')
             self._cmd_status = "register_r_name"
             return
@@ -92,8 +108,11 @@ class User:
         if cmd == 'help':
             bot.send_message(self.id, _help)
             return
-        if cmd == 'send':
-            ...
+        if cmd[:4] == 'send':
+            bot.send_message(self.id, "Отправка")
+            curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
+            self.current_number_of_task = curr_num
+            self.current_task.id = curr_num
         if cmd == 'status':
             ...
 
