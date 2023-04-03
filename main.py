@@ -1,7 +1,5 @@
 import json
 import signal
-import sqlite3
-
 import database
 import users
 import threading
