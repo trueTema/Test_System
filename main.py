@@ -1,9 +1,6 @@
 import json
-import multiprocessing
 import signal
-import time
-
-import telebot.types
+import sqlite3
 
 import database
 import users
@@ -13,8 +10,10 @@ import threading
 def save_data(_signal, _frame):
     """Saves data when the program is going to be closed"""
     cur = users.activity.head
+    connection = users.get_connection(threading.current_thread().native_id)
     while cur is not None:
-        database.update_user_info(cur.data[1])
+        database.update_user_info(cur.data[1], connection)
+        cur = cur.next
     exit(0)
 
 
@@ -27,6 +26,7 @@ def main():
             users.max_cache_size = data["max_cache_size"]
             users.max_afk_time = data["max_afk_time"]
             users.time_between_checks = data["time_between_checks"]
+            users._token = data["token"]
             file.close()
     except ...:
         print('While starting system it was unable to read config.json file')
@@ -34,7 +34,7 @@ def main():
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su']
 
     #  starting cleaning cache
-    th = threading.Thread(target=users.check_cache)
+    th = threading.Thread(target=users.cycle_check)
     th.daemon = True
     th.start()
 
@@ -43,14 +43,16 @@ def main():
     def receive_cmds(message):
         user_id = message.from_user.id
         cmd = message.text[1:]
-        users.update_cache(user_id)
+        connection = users.get_connection(threading.current_thread().native_id)
+        users.update_cache(user_id, connection)
         users.cache[user_id].data[1].cmd_handler(cmd)
 
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
         user_id = message.from_user.id
         txt = message.text
-        users.update_cache(user_id)
+        connection = users.get_connection(threading.current_thread().native_id)
+        users.update_cache(user_id, connection)
         users.cache[user_id].data[1].txt_handler(txt)
 
     @users.bot.message_handler(content_types=['document'])

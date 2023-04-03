@@ -1,10 +1,13 @@
+import signal
+import sqlite3
+import threading
 import time
 import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
 
-
+_token = ''
 bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
@@ -14,6 +17,22 @@ _help = "Список доступных команд:\n\n" \
         "report <текст обращения> - сообщить об ошибке\n" \
         "send <номер задачи> - отправить решение на проверку\n" \
         "status - получить информацию о своих текущих баллах за задачи"
+
+connections = dict()
+"""Hash table that contains connections for threads"""
+
+
+def get_connection(thread_id: int) -> sqlite3.Connection:
+    """
+    returns connection to database for any thread
+    :param thread_id:
+    :return: connection to database
+    """
+    if thread_id in connections.keys():
+        return connections[thread_id]
+    connection = sqlite3.connect("user_info.sql")
+    connections[thread_id] = connection
+    return connection
 
 
 class User:
@@ -61,6 +80,9 @@ class User:
             self.super_user_cmd(cmd[3:])
             return
         if cmd == 'start':
+            if self.name != '':
+                bot.send_message(self.id, "Вы уже зарегистрированы.")
+                return
             bot.send_message(self.id, 'Введите Фамилию Имя:')
             self._cmd_status = "register_r_name"
             return
@@ -86,9 +108,10 @@ max_afk_time = 10 * 60  # seconds
 time_between_checks = 5 * 60  # time between two checks in check_cache() in seconds
 
 
-def update_cache(id: int):
+def update_cache(id: int, connection: sqlite3.Connection):
     """
     Updates cache if you need to add User there
+    :param connection: connection to sql database
     :param id: id of user that you need to add in cache
     """
     cur_time = time.time()
@@ -96,42 +119,45 @@ def update_cache(id: int):
         user = cache[id].data[1]
         activity.delete(cache[id])
     else:
-        user = database.get_user(id)
+        user = database.get_user(id, connection)
     if user is None:
         user = User(id)
-        database.add_user(user)
+        database.add_user(user, connection)
     activity.push((cur_time, user))
     cache[id] = activity.head
     if activity.size > max_cache_size:
         cur_id = activity.tail.data[1].id
-        database.update_user_info(activity.tail.data[1])
+        database.update_user_info(activity.tail.data[1], connection)
         cache.pop(cur_id)
         activity.pop()
 
 
-def test_decor(func):
+def cycle_check():
     """Decorator that makes infinity cycle for function with pause between iterations"""
-    def wrapper():
+    connection = sqlite3.connect("user_info.sql")
+    """database connection"""
+    try:
         while True:
-            func()
+            check_cache(connection)
             #  node = activity.head
             #  while node is not None:
             #      print(node.data[0], node.data[1].id)
             #      node = node.next
             #  print('-' * 20)
             time.sleep(time_between_checks)
+    except (KeyboardInterrupt, SystemExit):
+        connection.close()
+        raise KeyboardInterrupt
 
-    return wrapper
 
-
-@test_decor
-def check_cache():
+def check_cache(connection: sqlite3.Connection):
     """
     Removes elements from cache if they have not been used for a long time
     """
     cur_time = time.time()
     #  print(cur_time)
     while activity.size and cur_time - activity.tail.data[0] > max_afk_time:
-        id = activity.tail.data[1].id
-        cache.pop(id)
+        user = activity.tail.data[1]
+        database.update_user_info(user, connection)
+        cache.pop(user.id)
         activity.pop()
