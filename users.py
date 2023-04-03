@@ -89,7 +89,7 @@ class User:
         """
         if cmd[:3] == 'su ':
             if self.status != 'super_user':
-                bot.send_message(self.id, "Ошибка доступа.")
+                bot.send_message(self.id, "Ошибка доступа.")#dsdsds
                 return
             self.super_user_cmd(cmd[3:])
             return
