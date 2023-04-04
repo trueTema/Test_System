@@ -1,6 +1,21 @@
 users (
     id primary key
-    name varchar(32) not null
-    status varchar(32) not null
+    name varchar(128) not null
+    status varchar(16) not null
     study_group varchar(32) not null
 )
+
+parcels (
+    problem_ID int primary key
+    student_ID int primary key
+    points float not null
+    answer text not null
+    sending_time timestamp
+)
+
+problems (
+    problem_ID int primary key
+    teacher_ID int primary_key
+    problem_situation text
+)
+

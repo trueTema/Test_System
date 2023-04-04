@@ -1,18 +1,14 @@
-import signal
 import sqlite3
-import threading
 import time
-
-from telebot import types
-
 import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
+from telebot import types
 from Task import Task
 
-_token=""
-bot = tgbot.TeleBot(_token)
+token = '6003964860:AAHk29MXvsxDCH1BGqOsJbm-W9fMJ64Maxc'
+bot = tgbot.TeleBot(token)
 
 statuses = enum("student", "teacher", "super_user")
 
@@ -43,15 +39,12 @@ class User:
     _cmd_status = None
 
     def __init__(self, id: int, name='', status: statuses = "student",
-                 study_group=None, current_task=Task):
+                 study_group=None):
         """Initializing constructor"""
         self.id = id
         self.name = name
         self.status = status
         self.study_group = study_group
-
-        self.current_task = current_task  # Field of user's task
-        self.current_task.Task.setUserId(self.id)
 
     def txt_handler(self, txt: str):
         """
@@ -72,7 +65,6 @@ class User:
         if self._cmd_status == "register_r_study_g":
             self.study_group = txt
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
-            self.current_task.Task.setUserId(self.id)
             self._cmd_status = None
             return
 
@@ -90,7 +82,7 @@ class User:
         """
         if cmd[:3] == 'su ':
             if self.status != 'super_user':
-                bot.send_message(self.id, "Ошибка доступа.")#dsdsds
+                bot.send_message(self.id, "Ошибка доступа.")
                 return
             self.super_user_cmd(cmd[3:])
             return
@@ -112,8 +104,6 @@ class User:
         if cmd[:4] == 'send':
             bot.send_message(self.id, "Отправка")
             curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
-            self.current_number_of_task = curr_num
-            self.current_task.Task.setUserId(curr_num)#Need to add list of id's from DataBase, which will be created by admin
         if cmd == 'status':
             ...
 

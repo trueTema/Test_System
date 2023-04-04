@@ -15,20 +15,23 @@ def save_data(_signal, _frame):
     exit(0)
 
 
-def main():
-    """Main function of app"""
-    #  initializing variables:
+def init():
+    """Initializing variables"""
     try:
         with open('config.json', 'r') as file:
             data = json.load(file)
             users.max_cache_size = data["max_cache_size"]
             users.max_afk_time = data["max_afk_time"]
             users.time_between_checks = data["time_between_checks"]
-            users._token = data["token"]
+            users.token = data["token"]
+            users.bot = users.tgbot.TeleBot(users.token)
             file.close()
     except ...:
         print('While starting system it was unable to read config.json file')
 
+
+def main():
+    """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su']
 
     #  starting cleaning cache
@@ -44,6 +47,7 @@ def main():
         connection = users.get_connection(threading.current_thread().native_id)
         users.update_cache(user_id, connection)
         users.cache[user_id].data[1].cmd_handler(cmd)
+
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
         user_id = message.from_user.id
@@ -58,12 +62,12 @@ def main():
         """
         Checking and downloading a file
         """
-        if (message.document.file_name[-2:] != "py"):
+        if message.document.file_name[-2:] != "py":
             users.bot.reply_to(message, "Неправильный формат данных")
             return
         download = users.bot.download_file(file_info.file_path)  # This part addes just for testing
         # For testing on your computer - pass ypi own way
-        src = "C:/Users/georg/Downloads" + message.document.file_name
+        src = message.document.file_name
         with open(src, "wb") as new_file:
             new_file.write(download)
         users.bot.reply_to(message, "Ваш файл был принят")
@@ -74,6 +78,7 @@ def main():
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, save_data)
     signal.signal(signal.SIGTERM, save_data)
+    init()
     try:
         main()
     except Exception as e:
