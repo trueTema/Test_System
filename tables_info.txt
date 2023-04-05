@@ -18,4 +18,3 @@ problems (
     teacher_ID int primary_key
     problem_situation text
 )
-

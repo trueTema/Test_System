@@ -14,7 +14,6 @@ _token=""
 bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
-
 key_word = "8pJSSMgH7B" # KeyWord for admin
 
 """
