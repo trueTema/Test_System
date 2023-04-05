@@ -9,8 +9,10 @@ import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
+import Task
+from Task.Task import TASK
 
-_token=""
+_token = ""
 bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
@@ -66,6 +68,13 @@ class User:
 
     _cmd_status = None
 
+    """
+    Needed in order to enter the wording of the task itself into the Task class as a separate message
+    After adding the wording to the class, it is "pushed" to the database and again becomes None
+    """
+
+    cur_Task = None
+
     def __init__(self, id: int, name='', status: statuses = "student",
                  study_group=None):
         """Initializing constructor"""
@@ -95,6 +104,19 @@ class User:
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
             self._cmd_status = None
             return
+
+        if self._cmd_status == "admin_pulling_task":
+            field_text = txt
+            self.cur_Task.setStatement(field_text)
+            bot.send_message(self.id, self.cur_Task.getId())       #|
+            bot.send_message(self.id, self.cur_Task.getUserId())   #|> Added just to check if it works.
+            bot.send_message(self.id, self.cur_Task.getStatement())#|
+            #  There should be a function where we "push" the task into the database
+            self._cmd_status = None
+            self.cur_Task = None
+            return
+
+
 
     def super_user_cmd(self, cmd: str):
         """
@@ -138,8 +160,12 @@ class User:
                 self.status = "student"
                 return
             if cmd[:7] == "addTask":
-                id = int(str(cmd.split(" ")[1]))
-                bot.send_message(self.id, id)
+                id_of = int(str(cmd.split(" ")[1]))
+                self._cmd_status = "admin_pulling_task"
+                new_one = TASK(id_of)
+                new_one.setUserId(self.id)
+                self.cur_Task = new_one;
+                bot.send_message(self.id, id_of)
                 return
 
         if cmd[:4] == 'send':
@@ -153,7 +179,7 @@ class User:
                 bot.send_message(self.id, f"Здравствуйте, {self.name}!",reply_markup=kb1) #Special keyboard for admin
                 self.status = "teacher"
             else:
-                bot.send_message(self.id,str(cmd[9:])) #Exception
+                bot.send_message(self.id, str(cmd[9:])) #Exception
                 bot.send_message(self.id, "У вас нет доступа к данному статусу")
             return
         if cmd == 'status':
