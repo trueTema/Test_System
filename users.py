@@ -1,22 +1,50 @@
+import signal
 import sqlite3
+import threading
 import time
+
+from telebot import types
+
 import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
-from telebot import types
-from Task import Task
 
-token = '6003964860:AAHk29MXvsxDCH1BGqOsJbm-W9fMJ64Maxc'
-bot = tgbot.TeleBot(token)
+_token=""
+bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
+
+key_word = "8pJSSMgH7B" # KeyWord for admin
+
+"""
+Admin login will be initialized with a hiden command - /adminLog key_word
+"""
 
 _help = "Список доступных команд:\n\n" \
         "help - просмотр списка команд\n" \
         "report <текст обращения> - сообщить об ошибке\n" \
         "send <номер задачи> - отправить решение на проверку\n" \
         "status - получить информацию о своих текущих баллах за задачи"
+"""
+List of commands for teacher which will be in his own "special" help
+"""
+_help_for_admin = "Список команд для учителя\n\n" \
+                      "addTask (parameters) - добавить задачку\n" \
+                      "deleteTask (parameters) - удалить задачку\n" \
+                      "addGroup - добавить группу\n" \
+                      "deleteGroup - удалить группу\n" \
+                      "getTask - получить номер\n" \
+                      "exit - смена статуса на ученика"
+
+
+"""
+Some description for Super User commands
+Commands like 'add/deleteTask' don't need to be explained
+'add\deleteGroup' needs for cases like: User enters group, which doesn't exist and we throw error\exception
+'getTask' is for correct the fields of chosen task ( SuperUser find out that, for example, field answer is wrong and has
+                                                                                        to be corrected
+"""
 
 connections = dict()
 """Hash table that contains connections for threads"""
@@ -36,6 +64,7 @@ def get_connection(thread_id: int) -> sqlite3.Connection:
 
 
 class User:
+
     _cmd_status = None
 
     def __init__(self, id: int, name='', status: statuses = "student",
@@ -80,18 +109,18 @@ class User:
         Command handler for each user
         :param cmd: command
         """
+        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(types.KeyboardButton(text="/help"), types.KeyboardButton(text="/status"))
         if cmd[:3] == 'su ':
             if self.status != 'super_user':
-                bot.send_message(self.id, "Ошибка доступа.")
+                bot.send_message(self.id, "Ошибка доступа.", reply_markup=kb)
                 return
             self.super_user_cmd(cmd[3:])
             return
         if cmd == 'start':
             if self.name != '':
-                bot.send_message(self.id, "Вы уже зарегистрированы.")
+                bot.send_message(self.id, "Вы уже зарегистрированы.", reply_markup=kb)
                 return
-            kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-            kb.row(types.KeyboardButton(text="/help"), types.KeyboardButton(text="/status"))
             bot.send_message(self.id, 'Введите Фамилию Имя:')
             self._cmd_status = "register_r_name"
             return
@@ -101,9 +130,33 @@ class User:
         if cmd == 'help':
             bot.send_message(self.id, _help)
             return
+        if cmd == "adminHelp" and self.status == "teacher": #Output a special keyboard for the teacher
+            bot.send_message(self.id, _help_for_admin)
+            return
+        if self.status == "teacher" or self.status == "super_user":
+            if cmd == "exit": #Change status for teacher or
+                bot.send_message(self.id,"Ваш статус был изменен", reply_markup=kb)          # super user to student
+                self.status = "student"
+                return
+            if cmd[:7] == "addTask":
+                id = int(str(cmd.split(" ")[1]))
+                bot.send_message(self.id, id)
+                return
+
         if cmd[:4] == 'send':
-            bot.send_message(self.id, "Отправка")
+            bot.send_message(self.id, "Отправка", reply_markup=kb)
             curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
+            self.current_number_of_task = curr_num
+            return
+        if cmd[:8] == "adminLog": #Login as admin
+            if str(cmd[9:]) != "" and str(cmd[9:]) == key_word: #!!! The key_word has to be right !!!
+                kb1 = kb.add(types.KeyboardButton(text="/adminHelp"))
+                bot.send_message(self.id, f"Здравствуйте, {self.name}!",reply_markup=kb1) #Special keyboard for admin
+                self.status = "teacher"
+            else:
+                bot.send_message(self.id,str(cmd[9:])) #Exception
+                bot.send_message(self.id, "У вас нет доступа к данному статусу")
+            return
         if cmd == 'status':
             ...
 
