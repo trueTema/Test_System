@@ -169,14 +169,11 @@ class User:
                 self._cmd_status = "admin_pulling_task"
                 new_one = TASK(id_of)
                 new_one.setUserId(self.id)
-                self.cur_Task = new_one;
-                bot.send_message(self.id, id_of)
+                self.cur_Task = new_one
                 return
 
         if cmd[:4] == 'send':
             bot.send_message(self.id, "Отправка", reply_markup=kb)
-            curr_num = str(cmd[4:]).replace("<", "").replace(">", "")
-            self.current_number_of_task = curr_num
             return
         if cmd[:8] == "adminLog": #Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word: #!!! The key_word has to be right !!!
