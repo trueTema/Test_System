@@ -47,6 +47,7 @@ def main():
     def receive_cmds(message):
         user_id = message.from_user.id
         cmd = message.text[1:]
+
         connection = users.get_connection(threading.current_thread().native_id)
         users.update_cache(user_id, connection)
         users.cache[user_id].data[1].cmd_handler(cmd)

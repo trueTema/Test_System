@@ -9,7 +9,6 @@ import LinkedList
 from debugpy.common.json import enum
 import database
 import telebot as tgbot
-import Task
 from Task.Task import TASK
 
 _token = ""
@@ -108,9 +107,15 @@ class User:
         if self._cmd_status == "admin_pulling_task":
             field_text = txt
             self.cur_Task.setStatement(field_text)
+            self.cur_Task.setTime(time.asctime())
             bot.send_message(self.id, self.cur_Task.getId())       #|
             bot.send_message(self.id, self.cur_Task.getUserId())   #|> Added just to check if it works.
             bot.send_message(self.id, self.cur_Task.getStatement())#|
+            bot.send_message(self.id, self.cur_Task.getTime())     #|
+            """
+            Adding the number sending time is necessary 
+            for the possible implementation of the deadline system in the future
+            """
             #  There should be a function where we "push" the task into the database
             self._cmd_status = None
             self.cur_Task = None
