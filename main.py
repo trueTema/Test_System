@@ -3,6 +3,8 @@ import signal
 
 from telebot import types
 
+import Package.Package
+import Task.Task
 import database
 import users
 import threading
@@ -21,15 +23,15 @@ def save_data(_signal, _frame):
 def init():
     """Initializing variables"""
     try:
-        with open('config.json', 'r') as file:
+        with open('Files/config.json', 'r') as file:
             data = json.load(file)
             users.max_cache_size = data["max_cache_size"]
             users.max_afk_time = data["max_afk_time"]
             users.time_between_checks = data["time_between_checks"]
-            users._token = data["token"]
             file.close()
     except ...:
         print('While starting system it was unable to read config.json file')
+
 
 def main():
     """Main function of app"""
@@ -51,11 +53,12 @@ def main():
         connection = users.get_connection(threading.current_thread().native_id)
         users.update_cache(user_id, connection)
         users.cache[user_id].data[1].cmd_handler(cmd)
+
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
         user_id = message.from_user.id
         txt = message.text
-        if txt[0] == '/': # Checking that the given text is not an attempt to enter a command
+        if txt[0] == '/':  # Checking that the given text is not an attempt to enter a command
             users.bot.reply_to(message, "Такой команды не существует")
         else:
             connection = users.get_connection(threading.current_thread().native_id)
@@ -68,7 +71,7 @@ def main():
         """
         Checking and downloading a file
         """
-        if (message.document.file_name[-2:] != "py"):
+        if message.document.file_name[-2:] != "py":
             users.bot.reply_to(message, "Неправильный формат данных")
             return
         download = users.bot.download_file(file_info.file_path)  # This part addes just for testing

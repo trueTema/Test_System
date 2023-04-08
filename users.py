@@ -1,6 +1,5 @@
-import signal
+import json
 import sqlite3
-import threading
 import time
 
 from telebot import types
@@ -11,7 +10,7 @@ import database
 import telebot as tgbot
 from Task.Task import TASK
 
-_token = ""
+_token = json.load(open('Files/config.json', 'r'))["token"]
 bot = tgbot.TeleBot(_token)
 
 statuses = enum("student", "teacher", "super_user")
@@ -58,7 +57,7 @@ def get_connection(thread_id: int) -> sqlite3.Connection:
     """
     if thread_id in connections.keys():
         return connections[thread_id]
-    connection = sqlite3.connect("user_info.sql")
+    connection = sqlite3.connect("Files/database.sql")
     connections[thread_id] = connection
     return connection
 
@@ -121,8 +120,6 @@ class User:
             self.cur_Task = None
             return
 
-
-
     def super_user_cmd(self, cmd: str):
         """
         Super user commands handler
@@ -175,10 +172,10 @@ class User:
         if cmd[:4] == 'send':
             bot.send_message(self.id, "Отправка", reply_markup=kb)
             return
-        if cmd[:8] == "adminLog": #Login as admin
-            if str(cmd[9:]) != "" and str(cmd[9:]) == key_word: #!!! The key_word has to be right !!!
+        if cmd[:8] == "adminLog":  # Login as admin
+            if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
                 kb1 = kb.add(types.KeyboardButton(text="/adminHelp"))
-                bot.send_message(self.id, f"Здравствуйте, {self.name}!",reply_markup=kb1) #Special keyboard for admin
+                bot.send_message(self.id, f"Здравствуйте, {self.name}!",reply_markup=kb1)  # Special keyboard for admin
                 self.status = "teacher"
             else:
                 bot.send_message(self.id, str(cmd[9:])) #Exception
@@ -224,7 +221,7 @@ def update_cache(id: int, connection: sqlite3.Connection):
 
 def cycle_check():
     """Decorator that makes infinity cycle for function with pause between iterations"""
-    connection = sqlite3.connect("user_info.sql")
+    connection = sqlite3.connect("Files/database.sql")
     """database connection"""
     try:
         while True:
