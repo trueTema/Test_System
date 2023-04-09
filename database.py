@@ -111,7 +111,7 @@ def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
         res = cur.fetchall()
         if len(res) == 0:
             return None
-        res_task = TASK(id=res[0][0], id_of_user=res[0][1], statement=res[0][2])
+        res_task = TASK(id=res[0][0], visible=res[0][1], id_of_user=res[0][2], statement=res[0][3])
         return res_task
     except Exception as e:
         print(f'[Error] While getting a problem from database {e} has occured.')

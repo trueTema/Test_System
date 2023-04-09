@@ -15,6 +15,7 @@ parcels (
 
 problems (
     problem_ID int primary key
+    visible_of int
     teacher_ID int not null check(teacher_ID > 0) unique
     problem_situation text
 )
