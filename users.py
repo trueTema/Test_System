@@ -34,7 +34,7 @@ _help_for_admin = "Список команд для учителя\n\n" \
                       "addGroup - добавить группу\n" \
                       "deleteGroup - удалить группу\n" \
                       "getTask - получить номер\n" \
-                      "exit - смена статуса на ученика"
+                      "exit - смена статуса на ученика\n" \
 
 
 """
@@ -162,10 +162,13 @@ class User:
                 self.status = "student"
                 return
             if cmd[:7] == "addTask":
+                bot.send_message(self.id,"Добавляем")
                 id_of = int(str(cmd.split(" ")[1]))
+                visibility_status = str(cmd.split(" ")[2])
                 self._cmd_status = "admin_pulling_task"
                 new_one = TASK(id_of)
-                new_one.setUserId(self.id)
+                new_one.id_of_user = self.id
+                new_one.visable = visibility_status.lower()
                 self.cur_Task = new_one
                 return
 

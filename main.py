@@ -36,7 +36,7 @@ def init():
 def main():
     """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su', "adminLog", "adminHelp", "exit",
-                "addTask"
+                "addTask", "addSctipt"
                 ]
 
     #  starting cleaning cache
@@ -71,14 +71,22 @@ def main():
         """
         Checking and downloading a file
         """
-        if message.document.file_name[-2:] != "py":
+        type_of_file = None
+        if (message.document.file_name[-2:] == "py"):
+            type_of_file = message.document.file_name[-2:]
+            #This file from Teacher
+        elif (message.document.file_name[-3:] == "txt"):
+            type_of_file = message.document.file_name[-3:]
+        if (type_of_file == None):
             users.bot.reply_to(message, "Неправильный формат данных")
             return
-        download = users.bot.download_file(file_info.file_path)  # This part addes just for testing
-        # For testing on your computer - pass ypi own way
+        download = users.bot.download_file(file_info.file_path)
         src = message.document.file_name
-        with open(src, "wb") as new_file:
-            new_file.write(download)
+        if (type_of_file == "py"):
+            src = "/Scripts/"+message.document.file_name
+            # with open(src, "wb") as new_file:
+            #     new_file.write(download)
+        # For testing on your computer - pass ypi own way
         users.bot.reply_to(message, "Ваш файл был принят")
 
     users.bot.polling(non_stop=True)
