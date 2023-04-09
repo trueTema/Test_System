@@ -1,3 +1,4 @@
+import datetime
 import json
 import sqlite3
 import time
@@ -9,6 +10,7 @@ from debugpy.common.json import enum
 import database
 import telebot as tgbot
 from Task.Task import TASK
+import threading
 
 _token = json.load(open('Files/config.json', 'r'))["token"]
 bot = tgbot.TeleBot(_token)
@@ -106,16 +108,23 @@ class User:
         if self._cmd_status == "admin_pulling_task":
             field_text = txt
             self.cur_Task.setStatement(field_text)
-            self.cur_Task.setTime(time.asctime())
-            self.cur_Task.time_of = time.asctime()
-            bot.send_message(self.id, self.cur_Task.getId())       #|
-            bot.send_message(self.id, self.cur_Task.getUserId())   #|> Added just to check if it works.
-            bot.send_message(self.id, self.cur_Task.getStatement())#|
-            bot.send_message(self.id, self.cur_Task.getTime())     #|
             """
             Adding the number sending time is necessary 
             for the possible implementation of the deadline system in the future
             """
+            coonection = get_connection(threading.current_thread().native_id)
+            if database.get_problem(self.cur_Task.id, coonection) != None:
+                bot.send_message(self.id, "Данная задача уде добавлена ранее")
+                return
+            database.add_problem(self.cur_Task, coonection)
+            bot.send_message(self.id, "Отправляю на сервер")
+            Current = database.get_problem(self.cur_Task.id, coonection)
+            bot.send_message(self.id,"Получаю с сервера")   #|
+            bot.send_message(self.id, str(Current.id))      #|
+            bot.send_message(self.id, Current.id_of_user)   #| Just for testin
+            bot.send_message(self.id, Current.statement)    #|
+            bot.send_message(self.id, str(Current.time_of)) #|
+            bot.send_message(self.id, str(Current.visable)) #|
             #  There should be a function where we "push" the task into the database
             self._cmd_status = None
             self.cur_Task = None
@@ -163,23 +172,30 @@ class User:
                 self.status = "student"
                 return
             if cmd[:7] == "addTask":
+                coonection = get_connection(threading.current_thread().native_id)
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
                     if visibility_status not in ["visible", "invisible"]:
-                        bot.send_message(self.id,"Неправильный формат статуса")
+                        bot.send_message(self.id, "Неправильный формат статуса")
+                        bot.send_message(self.id, visibility_status)
                         return
                     else:
                         break
-                bot.send_message(self.id,"Добавляем")
                 id_of = int(str(cmd.split(" ")[1]))
+                if database.get_problem(id_of, coonection) != None:
+                    bot.send_message(self.id, "Данная задача уде добавлена ранее")
+                    return
+                bot.send_message(self.id, "Добавляем")
                 self._cmd_status = "admin_pulling_task"
-                new_one = TASK(id_of)
-                new_one.id_of_user = self.id
-                if visibility_status=="visible":
+                if visibility_status == "visible":
                     visibility_status = 1
                 else:
-                    ...
-                new_one.visable = visibility_status.lower()
+                    visibility_status = 0
+                new_one = TASK(id_of, visibility_status)
+                now = datetime.datetime.now()
+                timestamp = int(datetime.datetime.timestamp(now))
+                new_one.time_of = timestamp
+                new_one.id_of_user = self.id
                 self.cur_Task = new_one
                 return
 
