@@ -83,9 +83,9 @@ def main():
         download = users.bot.download_file(file_info.file_path)
         src = message.document.file_name
         if (type_of_file == "py"):
-            src = "/Scripts/"+message.document.file_name
-            # with open(src, "wb") as new_file:
-            #     new_file.write(download)
+            src = "Scripts/"+message.document.file_name
+            with open(src, "wb") as new_file:
+                 new_file.write(download)
         # For testing on your computer - pass ypi own way
         users.bot.reply_to(message, "Ваш файл был принят")
 

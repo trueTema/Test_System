@@ -29,7 +29,7 @@ _help = "Список доступных команд:\n\n" \
 List of commands for teacher which will be in his own "special" help
 """
 _help_for_admin = "Список команд для учителя\n\n" \
-                      "addTask (parameters) - добавить задачку\n" \
+                      "addTask id visible\invisible - добавить задачку\n" \
                       "deleteTask (parameters) - удалить задачку\n" \
                       "addGroup - добавить группу\n" \
                       "deleteGroup - удалить группу\n" \
@@ -107,6 +107,7 @@ class User:
             field_text = txt
             self.cur_Task.setStatement(field_text)
             self.cur_Task.setTime(time.asctime())
+            self.cur_Task.time_of = time.asctime()
             bot.send_message(self.id, self.cur_Task.getId())       #|
             bot.send_message(self.id, self.cur_Task.getUserId())   #|> Added just to check if it works.
             bot.send_message(self.id, self.cur_Task.getStatement())#|
@@ -162,12 +163,22 @@ class User:
                 self.status = "student"
                 return
             if cmd[:7] == "addTask":
+                while True:
+                    visibility_status = str(cmd.split(" ")[2])
+                    if visibility_status not in ["visible", "invisible"]:
+                        bot.send_message(self.id,"Неправильный формат статуса")
+                        return
+                    else:
+                        break
                 bot.send_message(self.id,"Добавляем")
                 id_of = int(str(cmd.split(" ")[1]))
-                visibility_status = str(cmd.split(" ")[2])
                 self._cmd_status = "admin_pulling_task"
                 new_one = TASK(id_of)
                 new_one.id_of_user = self.id
+                if visibility_status=="visible":
+                    visibility_status = 1
+                else:
+                    ...
                 new_one.visable = visibility_status.lower()
                 self.cur_Task = new_one
                 return
