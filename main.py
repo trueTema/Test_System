@@ -12,6 +12,8 @@ import threading
 
 def save_data(_signal, _frame):
     """Saves data when the program is going to be closed"""
+    with open('Files/banned.json', 'w') as file:
+        json.dump(list(users.banned_users), file)
     cur = users.activity.head
     connection = users.get_connection(threading.current_thread().native_id)
     while cur is not None:
@@ -29,14 +31,17 @@ def init():
             users.max_afk_time = data["max_afk_time"]
             users.time_between_checks = data["time_between_checks"]
             file.close()
-    except ...:
-        print('While starting system it was unable to read config.json file')
+        with open('Files/banned.json', 'r') as file:
+            users.banned_users = set(list(json.load(file)))
+            file.close()
+    except Exception as e:
+        print(f'While starting system {e} has occured.')
 
 
 def main():
     """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su', "adminLog", "adminHelp", "exit",
-                "addTask", "addSctipt"
+                "addTask", "addScript"
                 ]
 
     #  starting cleaning cache
@@ -48,6 +53,9 @@ def main():
     @users.bot.message_handler(commands=cmd_list)
     def receive_cmds(message):
         user_id = message.from_user.id
+        if user_id in users.banned_users:
+            users.bot.send_message(user_id, 'Вы заблокированы.')
+            return
         cmd = message.text[1:]
 
         connection = users.get_connection(threading.current_thread().native_id)
@@ -57,9 +65,12 @@ def main():
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
         user_id = message.from_user.id
+        if user_id in users.banned_users:
+            users.bot.send_message(user_id, 'Вы заблокированы.')
+            return
         txt = message.text
         if txt[0] == '/':  # Checking that the given text is not an attempt to enter a command
-            users.bot.reply_to(message, "Такой команды не существует")
+            users.bot.reply_to(message, "Неизвестная команда")
         else:
             connection = users.get_connection(threading.current_thread().native_id)
             users.update_cache(user_id, connection)
@@ -72,22 +83,22 @@ def main():
         Checking and downloading a file
         """
         type_of_file = None
-        if (message.document.file_name[-2:] == "py"):
+        if message.document.file_name[-2:] == "py":
             type_of_file = message.document.file_name[-2:]
-            #This file from Teacher
-        elif (message.document.file_name[-3:] == "txt"):
+            #  This file from Teacher
+        elif message.document.file_name[-3:] == "txt":
             type_of_file = message.document.file_name[-3:]
-        if (type_of_file == None):
-            users.bot.reply_to(message, "Неправильный формат данных")
+        if type_of_file is None:
+            users.bot.reply_to(message, "Некорректный формат данных")
             return
         download = users.bot.download_file(file_info.file_path)
         src = message.document.file_name
-        if (type_of_file == "py"):
-            src = "Scripts/"+message.document.file_name
+        if type_of_file == "py":
+            src = "Scripts/" + message.document.file_name
             with open(src, "wb") as new_file:
-                 new_file.write(download)
+                new_file.write(download)
         # For testing on your computer - pass ypi own way
-        users.bot.reply_to(message, "Ваш файл был принят")
+        users.bot.reply_to(message, "Файл принят")
 
     users.bot.polling(non_stop=True)
 
