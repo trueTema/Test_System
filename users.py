@@ -129,14 +129,14 @@ class User:
                 bot.send_message(self.id, "Задача уже добавлена ранее")
                 return
             database.add_problem(self.cur_Task, connection)
-            bot.send_message(self.id, "Отправляю на сервер")
+            # bot.send_message(self.id, "Отправляю на сервер")
             current = database.get_problem(self.cur_Task.id, connection)
-            bot.send_message(self.id, "Получаю с сервера")  # |
-            bot.send_message(self.id, str(current.id))  # |
-            bot.send_message(self.id, current.id_of_user)  # | Just for testing
-            bot.send_message(self.id, current.statement)  # |
-            bot.send_message(self.id, str(current.time_of))  # |
-            bot.send_message(self.id, str(current.visable))  # |
+            # bot.send_message(self.id, "Получаю с сервера")  # |
+            # bot.send_message(self.id, str(current.id))  # |
+            # bot.send_message(self.id, current.id_of_user)  # | Just for testing
+            # bot.send_message(self.id, current.statement)  # |
+            # bot.send_message(self.id, str(current.time_of))  # |
+            # bot.send_message(self.id, str(current.visable))  # |
             #  There should be a function where we "push" the task into the database
             self._cmd_status = None
             self.cur_Task = None
@@ -223,7 +223,20 @@ class User:
             bot.send_message(self.id, _help_for_admin)
             return
         if cmd[:4] == 'send':
+            if self.status == "teacher" or self.status == "super_user":
+                bot.send_message(self.id, "Вы не можете отправлять посылки, т.к. вы - BigДядя")
+                return
+            if len(cmd.split(" ")) != 2:
+                bot.send_message(self.id, "Вы не ввели айди номера или сделали это неправильно ")
+                return
+            id_of_parcell = int(cmd.split(" ")[1])
+            coonection = get_connection(threading.current_thread().native_id)
+            # working_task = database.get_problem(id_of_parcell, coonection)
+            # self.cur_Task = TASK (id_of_parcell, working_task.visible)
+            self._cmd_status = "pushing_parcel"
+            self.cur_Task = id_of_parcell
             bot.send_message(self.id, "Отправка", reply_markup=kb)
+            bot.send_message(self.id, str(self.cur_Task))
             return
         if cmd[:8] == "adminLog":  # Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
@@ -237,14 +250,36 @@ class User:
             return
         if cmd == 'status':
             ...
-
-        if self.status == "teacher" or self.status == "super_user":
-            if cmd == "exit":  # Change status for teacher or
-                bot.send_message(self.id, "Ваш статус был изменен", reply_markup=kb)  # super user to student
+        if cmd == "exit":
+            if self.status == "teacher" or self.status == "super_user":
+                bot.send_message(self.id, "Ваш статус был изменен", reply_markup=kb)  # super user to student)
                 self.status = "student"
                 return
-            if cmd[:7] == "addTask":
+            else:
+                bot.send_message(self.id, "У вас нет доступа к данной команде")
+        if cmd[:10] == "deleteTask":
+            if self.status == "teacher" or self.status == "super_user":
+                if len(cmd.split(" ")) == 1:
+                    bot.send_message(self.id, "Вы не ввели ID задачи")
+                    return
+                id_of_task = int(cmd.split(" ")[1])
                 coonection = get_connection(threading.current_thread().native_id)
+                if database.get_problem(id_of_task, coonection) is not None:
+                    database.delete_problem(id_of_task, coonection)
+                    bot.send_message(self.id, f"Задача под индексом {id_of_task} была удалена")
+                    return
+                else:
+                    bot.send_message(self.id,"Данной команды нет в базе данных")
+                    return
+            else:
+                bot.send_message(self.id, "У вас нет доступа к этой команде")
+                return
+        if cmd[:7] == "addTask":
+            if self.status == "teacher" or self.status == "super_user":
+                coonection = get_connection(threading.current_thread().native_id)
+                if len(cmd.split(" ")) != 3:
+                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask ID visible/visible")
+                    return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
                     if visibility_status not in ["visible", "invisible"]:
@@ -270,6 +305,8 @@ class User:
                 new_one.id_of_user = self.id
                 self.cur_Task = new_one
                 return
+            else:
+                bot.send_message(self.id, "У вас нет доступа к этой команде")
 
 
 activity = LinkedList.LinkedList()
