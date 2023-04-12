@@ -79,7 +79,7 @@ def main():
     @users.bot.message_handler(content_types=['document'])
     def receive_doc(message):
         file_info = users.bot.get_file(message.document.file_id)
-        id_of_user = message.from_user.id
+        user_id = message.from_user.id
         """
         Checking and downloading a file
         """
@@ -88,9 +88,6 @@ def main():
             type_of_file = message.document.file_name[-2:]
             #  This file from Teacher
         elif message.document.file_name[-3:] == "txt":
-            if (message.from_user.status == "teacher" or message.from_user.status == "super_user"):
-                users.bot.reply_to(message, "Вы не можете отправлять посылку")
-                return
             type_of_file = message.document.file_name[-3:]
         if type_of_file is None:
             users.bot.reply_to(message, "Некорректный формат данных")
@@ -101,8 +98,12 @@ def main():
             src = "Scripts/" + message.document.file_name
             with open(src, "wb") as new_file:
                 new_file.write(download)
+            return
+        else:
+            users.bot.reply_to(message, download)
         # For testing on your computer - pass ypi own way
         users.bot.reply_to(message, "Файл принят")
+        return
 
     users.bot.polling(non_stop=True)
 
