@@ -41,7 +41,7 @@ def init():
 def main():
     """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'status', 'su', "adminLog", "adminHelp", "exit",
-                "addTask", "addScript", "deleteTask"
+                "addTask", "addScript", "deleteTask", "updateTask"
                 ]
 
     #  starting cleaning cache
@@ -100,7 +100,8 @@ def main():
                 new_file.write(download)
             return
         else:
-            users.bot.reply_to(message, download)
+            # users.bot.reply_to(message, download)
+            users.cache[user_id].data[1].txt_handler(download)
         # For testing on your computer - pass ypi own way
         users.bot.reply_to(message, "Файл принят")
         return

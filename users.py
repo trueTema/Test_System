@@ -9,6 +9,7 @@ import LinkedList
 import database
 import telebot as tgbot
 from Task.Task import TASK
+from Package.Package import Package
 import threading
 
 _token = json.load(open('Files/config.json', 'r'))["token"]
@@ -43,7 +44,8 @@ List of commands for teacher which will be in his own "special" help
 """
 _help_for_admin = "Список команд для учителя\n\n" \
                   "addTask id visible\invisible - добавить задачку\n" \
-                  "deleteTask (parameters) - удалить задачку\n" \
+                  "deleteTask id - удалить задачку\n" \
+                  "updateTask id - обновить задачу\n"\
                   "addGroup - добавить группу\n" \
                   "deleteGroup - удалить группу\n" \
                   "getTask - получить номер\n" \
@@ -116,7 +118,27 @@ class User:
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
             self._cmd_status = None
             return
-
+        if self._cmd_status == "updating_parcell":
+            now = datetime.datetime.now()
+            timestamp = int(datetime.datetime.timestamp(now))
+            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_Task,
+                                      answer=str(txt))
+            connection = get_connection(threading.current_thread().native_id)
+            database.update_parcel(current_parcell, connection)  # Updating parcell
+            bot.send_message(self.id, "Данная посылка уже существует, а поэтому обновлена")
+            self.cur_Task = None
+            self._cmd_status = None
+            return
+        if self._cmd_status == "pushing_parcel":
+            now = datetime.datetime.now()
+            timestamp = int(datetime.datetime.timestamp(now))
+            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_Task, answer=str(txt))
+            connection = get_connection(threading.current_thread().native_id)
+            database.add_parcel(current_parcell, connection)#Sending parcell
+            self.cur_Task = None
+            self._cmd_status = None
+            bot.send_message(self.id, "Посылка была отправлена")
+            return
         if self._cmd_status == "admin_pulling_task":
             field_text = txt
             self.cur_Task.setStatement(field_text)
@@ -127,6 +149,7 @@ class User:
             connection = get_connection(threading.current_thread().native_id)
             if database.get_problem(self.cur_Task.id, connection) is not None:
                 bot.send_message(self.id, "Задача уже добавлена ранее")
+                self._cmd_status = "updating_task"
                 return
             database.add_problem(self.cur_Task, connection)
             # bot.send_message(self.id, "Отправляю на сервер")
@@ -141,6 +164,17 @@ class User:
             self._cmd_status = None
             self.cur_Task = None
             return
+        if self._cmd_status == "updating_task":
+            field_text = txt
+            self.cur_Task.statement = field_text
+            connection = get_connection(threading.current_thread().native_id)
+            database.update_problem(self.cur_Task, connection)
+            bot.send_message(self.id, "Задача была успешно обновлена")
+            self.cur_Task = None
+            self._cmd_status = None
+            return
+
+
 
     def super_user_cmd(self, cmd: str):
         """
@@ -231,12 +265,24 @@ class User:
                 return
             id_of_parcell = int(cmd.split(" ")[1])
             coonection = get_connection(threading.current_thread().native_id)
-            # working_task = database.get_problem(id_of_parcell, coonection)
-            # self.cur_Task = TASK (id_of_parcell, working_task.visible)
-            self._cmd_status = "pushing_parcel"
+            if database.get_problem(id_of_parcell, coonection) == None:
+                bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
+                return
+            list_of_parcells = database.get_user_parcels(self.id, coonection)
+            if len(list_of_parcells) == 0:
+                self._cmd_status = "pushing_parcel"
+                bot.send_message(self.id, "Отправка", reply_markup=kb)
+            else:
+                for j in list_of_parcells:#If we find at least one match with the data, we update the package
+                    if id_of_parcell == j.id_task:
+                        self._cmd_status = "updating_parcell"
+                        self.cur_Task = id_of_parcell
+                        bot.send_message(self.id, "Обновление посылки")
+                        break
+                else:
+                    self._cmd_status = "pushing_parcel"
+                    bot.send_message(self.id, "Отправка", reply_markup=kb)
             self.cur_Task = id_of_parcell
-            bot.send_message(self.id, "Отправка", reply_markup=kb)
-            bot.send_message(self.id, str(self.cur_Task))
             return
         if cmd[:8] == "adminLog":  # Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
@@ -248,6 +294,39 @@ class User:
                 bot.send_message(self.id, str(cmd[9:]))  # Exception
                 bot.send_message(self.id, "Ошибка доступа.")
             return
+        if cmd[:10] == "updateTask":
+            if statuses[self.status] == 0:
+                bot.send_message(self.id, "У вас нет прав для этой команды")
+                return
+            else:
+                id_of_task = int(cmd.split(" ")[1])
+                coonection = get_connection(threading.current_thread().native_id)
+                if database.get_problem(id_of_task, coonection) == None:
+                    bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачку")
+                    return
+                if len(cmd.split(" ")) != 3:
+                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask ID visible/invisible")
+                    return
+                while True:
+                    visibility_status = str(cmd.split(" ")[2])
+                    if visibility_status not in ["visible", "invisible"]:
+                        bot.send_message(self.id, "Некорректный формат статуса")
+                        return
+                    else:
+                        if visibility_status == "visible":
+                            visibility_status = 1
+                        else:
+                            visibility_status = 0
+                        break
+                current_task = database.get_problem(id_of_task, coonection)
+                current_task.visible = visibility_status
+                now = datetime.datetime.now()
+                timestamp = int(datetime.datetime.timestamp(now))
+                current_task.time_of = timestamp
+                bot.send_message(self.id, "Обновление таска")
+                self.cur_Task = current_task
+                self._cmd_status = "updating_task"
+                return
         if cmd == 'status':
             ...
         if cmd == "exit":
@@ -269,7 +348,7 @@ class User:
                     bot.send_message(self.id, f"Задача под индексом {id_of_task} была удалена")
                     return
                 else:
-                    bot.send_message(self.id,"Данной команды нет в базе данных")
+                    bot.send_message(self.id, "Данной команды нет в базе данных")
                     return
             else:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
@@ -284,13 +363,14 @@ class User:
                     visibility_status = str(cmd.split(" ")[2])
                     if visibility_status not in ["visible", "invisible"]:
                         bot.send_message(self.id, "Некорректный формат статуса")
-                        bot.send_message(self.id, visibility_status)
+                        # bot.send_message(self.id, visibility_status)
                         return
                     else:
                         break
                 id_of = int(str(cmd.split(" ")[1]))
                 if database.get_problem(id_of, coonection) is not None:
                     bot.send_message(self.id, "Задача уже добавлена ранее")
+                    self._cmd_status = "updating_task"
                     return
                 bot.send_message(self.id, "Добавляем")
                 self._cmd_status = "admin_pulling_task"
