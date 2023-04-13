@@ -135,7 +135,7 @@ class User:
             timestamp = int(datetime.datetime.timestamp(now))
             current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_Task, answer=str(txt))
             connection = get_connection(threading.current_thread().native_id)
-            database.add_parcel(current_parcell, connection)#Sending parcell
+            database.add_parcel(current_parcell, connection)  # Sending parcell
             self.cur_Task = None
             self._cmd_status = None
             bot.send_message(self.id, "Посылка была отправлена")
@@ -153,15 +153,7 @@ class User:
                 self._cmd_status = "updating_task"
                 return
             database.add_problem(self.cur_Task, connection)
-            # bot.send_message(self.id, "Отправляю на сервер")
             current = database.get_problem(self.cur_Task.id, connection)
-            # bot.send_message(self.id, "Получаю с сервера")  # |
-            # bot.send_message(self.id, str(current.id))  # |
-            # bot.send_message(self.id, current.id_of_user)  # | Just for testing
-            # bot.send_message(self.id, current.statement)  # |
-            # bot.send_message(self.id, str(current.time_of))  # |
-            # bot.send_message(self.id, str(current.visable))  # |
-            #  There should be a function where we "push" the task into the database
             self._cmd_status = None
             self.cur_Task = None
             return
@@ -174,8 +166,6 @@ class User:
             self.cur_Task = None
             self._cmd_status = None
             return
-
-
 
     def super_user_cmd(self, cmd: str):
         """
@@ -191,11 +181,49 @@ class User:
                 bot.send_message(self.id, 'Неизвестный статус пользователя.')
                 return
             if user_id in cache.keys():
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять статус суперпользователя.')
+                    return
                 cache[user_id].data[1].status = new_status
                 bot.send_message(self.id, f'Статус пользователя {user_id} успешно изменён на {new_status}')
             else:
                 update_cache(user_id, get_connection(threading.current_thread().native_id))
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять статус суперпользователя.')
+                    return
                 cache[user_id].data[1].status = new_status
+            return
+        if cmd[0] == 'changeName':
+            user_id = int(cmd[1])
+            new_name = ' '.join(cmd[2:])
+            if user_id in cache.keys():
+                cache[user_id].data[1].name = new_name
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять имя суперпользователя.')
+                    return
+                bot.send_message(self.id, f'Имя пользователя {user_id} успешно изменёно на {new_name}')
+            else:
+                update_cache(user_id, get_connection(threading.current_thread().native_id))
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять имя суперпользователя.')
+                    return
+                cache[user_id].data[1].status = new_name
+            return
+        if cmd[0] == 'changeGroup':
+            user_id = int(cmd[1])
+            new_group = cmd[2]
+            if user_id in cache.keys():
+                cache[user_id].data[1].name = new_group
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять группу суперпользователя.')
+                    return
+                bot.send_message(self.id, f'Группа пользователя {user_id} успешно изменёна на {new_group}')
+            else:
+                update_cache(user_id, get_connection(threading.current_thread().native_id))
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                    bot.send_message(self.id, 'Невозможно поменять группу суперпользователя.')
+                    return
+                cache[user_id].data[1].status = new_group
             return
         if cmd[0] == 'ban':
             if len(cmd) > 2:
@@ -205,6 +233,12 @@ class User:
                 user_id = int(cmd[1])
             except ...:
                 bot.send_message(self.id, 'Некорректный формат команды.')
+                return
+            if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                bot.send_message(self.id, 'Невозможно заблокировать суперпользователя.')
+                return
+            if user_id == self.id:
+                bot.send_message(self.id, 'Невозможно заблокировать себя.')
                 return
             banned_users.add(user_id)
             bot.send_message(self.id, 'Пользователь успешно заблокирован.')
@@ -266,7 +300,7 @@ class User:
                 return
             id_of_parcell = int(cmd.split(" ")[1])
             coonection = get_connection(threading.current_thread().native_id)
-            if database.get_problem(id_of_parcell, coonection) == None:
+            if database.get_problem(id_of_parcell, coonection) is None:
                 bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
                 return
             list_of_parcells = database.get_user_parcels(self.id, coonection)
@@ -274,7 +308,7 @@ class User:
                 self._cmd_status = "pushing_parcel"
                 bot.send_message(self.id, "Отправка", reply_markup=kb)
             else:
-                for j in list_of_parcells:#If we find at least one match with the data, we update the package
+                for j in list_of_parcells:  # If we find at least one match with the data, we update the package
                     if id_of_parcell == j.id_task:
                         self._cmd_status = "updating_parcell"
                         self.cur_task_id = id_of_parcell
@@ -302,7 +336,7 @@ class User:
             else:
                 id_of_task = int(cmd.split(" ")[1])
                 coonection = get_connection(threading.current_thread().native_id)
-                if database.get_problem(id_of_task, coonection) == None:
+                if database.get_problem(id_of_task, coonection) is None:
                     bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачку")
                     return
                 if len(cmd.split(" ")) != 3:
@@ -388,6 +422,18 @@ class User:
                 return
             else:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
+        if cmd[:7] == 'getTask':
+            cmd = cmd.split()[1:]
+            try:
+                task_id = int(cmd[0])
+            except Exception as e:
+                bot.send_message(self.id, 'Некорректный формат ввода.')
+                return
+            cur_task = database.get_problem(task_id, get_connection(threading.current_thread().native_id))
+            if cur_task is None:
+                bot.send_message(self.id, 'Задача не существует.')
+                return
+            bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}')
 
 
 activity = LinkedList.LinkedList()

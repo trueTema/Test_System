@@ -186,7 +186,7 @@ def get_user(id: int, connection: sqlite3.Connection) -> users.User or None:
         res = cur.fetchall()
         if len(res) == 0:
             return None
-        result = users.User(res[0][0], res[0][1], res[0][2], res[0][3])
+        result = users.User(id=res[0][0], name=res[0][1], status=res[0][2], study_group=res[0][3])
         return result
     except Exception as e:
         print(f'[Error] While getting an user from database {e} has occured.')
