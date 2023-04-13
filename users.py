@@ -85,6 +85,7 @@ class User:
     """
 
     cur_Task = None
+    cur_task_id = None
 
     def __init__(self, id: int, name='', status: str = "student",
                  study_group=None):
@@ -121,7 +122,7 @@ class User:
         if self._cmd_status == "updating_parcell":
             now = datetime.datetime.now()
             timestamp = int(datetime.datetime.timestamp(now))
-            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_Task,
+            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_task_id,
                                       answer=str(txt))
             connection = get_connection(threading.current_thread().native_id)
             database.update_parcel(current_parcell, connection)  # Updating parcell
@@ -141,7 +142,7 @@ class User:
             return
         if self._cmd_status == "admin_pulling_task":
             field_text = txt
-            self.cur_Task.setStatement(field_text)
+            self.cur_Task.statement = field_text
             """
             Adding the number sending time is necessary 
             for the possible implementation of the deadline system in the future
@@ -276,13 +277,13 @@ class User:
                 for j in list_of_parcells:#If we find at least one match with the data, we update the package
                     if id_of_parcell == j.id_task:
                         self._cmd_status = "updating_parcell"
-                        self.cur_Task = id_of_parcell
+                        self.cur_task_id = id_of_parcell
                         bot.send_message(self.id, "Обновление посылки")
                         break
                 else:
                     self._cmd_status = "pushing_parcel"
                     bot.send_message(self.id, "Отправка", reply_markup=kb)
-            self.cur_Task = id_of_parcell
+            self.cur_task_id = id_of_parcell
             return
         if cmd[:8] == "adminLog":  # Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
