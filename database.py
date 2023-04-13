@@ -226,7 +226,7 @@ def get_user_parcels(user_id: int, connection: sqlite3.Connection) -> list:
         res = cur.fetchall()
         if len(res) == 0:
             return res
-        res = list(map(lambda x: Package(id_user=x[0], id_task=x[1], points=x[2], answer=x[3], date=x[4]), res))
+        res = list(map(lambda x: Package(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4]), res))
         return res
     except Exception as e:
         print(f'[Error] While searching for user\'s parcels in database {e} has occured.')
