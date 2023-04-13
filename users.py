@@ -133,7 +133,7 @@ class User:
         if self._cmd_status == "pushing_parcel":
             now = datetime.datetime.now()
             timestamp = int(datetime.datetime.timestamp(now))
-            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_Task, answer=str(txt))
+            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_task_id, answer=str(txt))
             connection = get_connection(threading.current_thread().native_id)
             database.add_parcel(current_parcell, connection)  # Sending parcell
             self.cur_Task = None
@@ -181,14 +181,14 @@ class User:
                 bot.send_message(self.id, 'Неизвестный статус пользователя.')
                 return
             if user_id in cache.keys():
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять статус суперпользователя.')
                     return
                 cache[user_id].data[1].status = new_status
                 bot.send_message(self.id, f'Статус пользователя {user_id} успешно изменён на {new_status}')
             else:
                 update_cache(user_id, get_connection(threading.current_thread().native_id))
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять статус суперпользователя.')
                     return
                 cache[user_id].data[1].status = new_status
@@ -197,33 +197,33 @@ class User:
             user_id = int(cmd[1])
             new_name = ' '.join(cmd[2:])
             if user_id in cache.keys():
-                cache[user_id].data[1].name = new_name
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять имя суперпользователя.')
                     return
+                cache[user_id].data[1].name = new_name
                 bot.send_message(self.id, f'Имя пользователя {user_id} успешно изменёно на {new_name}')
             else:
                 update_cache(user_id, get_connection(threading.current_thread().native_id))
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять имя суперпользователя.')
                     return
-                cache[user_id].data[1].status = new_name
+                cache[user_id].data[1].name = new_name
             return
         if cmd[0] == 'changeGroup':
             user_id = int(cmd[1])
             new_group = cmd[2]
             if user_id in cache.keys():
-                cache[user_id].data[1].name = new_group
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять группу суперпользователя.')
                     return
+                cache[user_id].data[1].study_group = new_group
                 bot.send_message(self.id, f'Группа пользователя {user_id} успешно изменёна на {new_group}')
             else:
                 update_cache(user_id, get_connection(threading.current_thread().native_id))
-                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+                if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981) and (user_id != self.id):
                     bot.send_message(self.id, 'Невозможно поменять группу суперпользователя.')
                     return
-                cache[user_id].data[1].status = new_group
+                cache[user_id].data[1].study_group = new_group
             return
         if cmd[0] == 'ban':
             if len(cmd) > 2:
@@ -303,21 +303,15 @@ class User:
             if database.get_problem(id_of_parcell, coonection) is None:
                 bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
                 return
-            list_of_parcells = database.get_user_parcels(self.id, coonection)
-            if len(list_of_parcells) == 0:
+            list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, coonection)
+            if len(list_of_parcels) == 0:
                 self._cmd_status = "pushing_parcel"
+                self.cur_task_id = id_of_parcell
                 bot.send_message(self.id, "Отправка", reply_markup=kb)
             else:
-                for j in list_of_parcells:  # If we find at least one match with the data, we update the package
-                    if id_of_parcell == j.id_task:
-                        self._cmd_status = "updating_parcell"
-                        self.cur_task_id = id_of_parcell
-                        bot.send_message(self.id, "Обновление посылки")
-                        break
-                else:
-                    self._cmd_status = "pushing_parcel"
-                    bot.send_message(self.id, "Отправка", reply_markup=kb)
-            self.cur_task_id = id_of_parcell
+                self._cmd_status = "updating_parcell"
+                self.cur_task_id = id_of_parcell
+                bot.send_message(self.id, "Обновление посылки")
             return
         if cmd[:8] == "adminLog":  # Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
@@ -335,12 +329,16 @@ class User:
                 return
             else:
                 id_of_task = int(cmd.split(" ")[1])
+                if len(cmd.split()) < 4:
+                    group = "None"
+                else:
+                    group = cmd.split()[3]
                 coonection = get_connection(threading.current_thread().native_id)
                 if database.get_problem(id_of_task, coonection) is None:
                     bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачку")
                     return
-                if len(cmd.split(" ")) != 3:
-                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask ID visible/invisible")
+                if len(cmd.split(" ")) not in (3, 4):
+                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask <ID> <visible/invisible> <group>")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -355,6 +353,7 @@ class User:
                         break
                 current_task = database.get_problem(id_of_task, coonection)
                 current_task.visible = visibility_status
+                current_task.group = group
                 now = datetime.datetime.now()
                 timestamp = int(datetime.datetime.timestamp(now))
                 current_task.time_of = timestamp
@@ -362,8 +361,12 @@ class User:
                 self.cur_Task = current_task
                 self._cmd_status = "updating_task"
                 return
-        if cmd == 'status':
-            ...
+        if cmd == 'profile':
+            bot.send_message(self.id, f'Имя: {self.name}\n'
+                                      f'Статус: {self.status}\n'
+                                      f'Группа: {self.study_group}'
+                                      )
+            return
         if cmd == "exit":
             if self.status == "teacher" or self.status == "super_user":
                 bot.send_message(self.id, "Ваш статус был изменен", reply_markup=kb)  # super user to student)
@@ -388,11 +391,32 @@ class User:
             else:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
                 return
+        if cmd[:6] == 'status':
+            cmd = cmd.split()
+            if len(cmd) != 2:
+                bot.send_message(self.id, 'Некорректный формат.')
+                return
+            try:
+                problem_id = int(cmd[1])
+            except Exception as e:
+                bot.send_message(self.id, 'Некорректный формат.')
+                return
+            parcels_list = database.get_user_problem_parcels(self.id, problem_id, get_connection(threading.current_thread().native_id))
+            if len(parcels_list) == 0:
+                bot.send_message(self.id, "У вас ещё нет посылок.")
+                return
+            parcels_list.sort(key=lambda x: x.date)
+            res = 'Ваши посылки:\n\nНомер\Баллы\Время отправки\n'
+            for i in range(len(parcels_list)):
+                date = datetime.datetime.utcfromtimestamp(parcels_list[i].date).strftime('%Y-%m-%d %H:%M:%S')
+                res += f'[{i+1}]' + ' ' + f'{parcels_list[i].points}' + ' ' + f'{date}\n'
+            bot.send_message(self.id, res)
+
         if cmd[:7] == "addTask":
             if self.status == "teacher" or self.status == "super_user":
                 coonection = get_connection(threading.current_thread().native_id)
-                if len(cmd.split(" ")) != 3:
-                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask ID visible/visible")
+                if len(cmd.split(" ")) not in (3, 4):
+                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> <group>")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -403,17 +427,21 @@ class User:
                     else:
                         break
                 id_of = int(str(cmd.split(" ")[1]))
-                if database.get_problem(id_of, coonection) is not None:
-                    bot.send_message(self.id, "Задача уже добавлена ранее")
-                    self._cmd_status = "updating_task"
-                    return
-                bot.send_message(self.id, "Добавляем")
-                self._cmd_status = "admin_pulling_task"
+                if len(cmd.split()) < 4:
+                    group = "None"
+                else:
+                    group = cmd.split()[3]
                 if visibility_status == "visible":
                     visibility_status = 1
                 else:
                     visibility_status = 0
-                new_one = TASK(id_of, visibility_status)
+                cur_task = database.get_problem(id_of, coonection)
+                if cur_task is not None:
+                    bot.send_message(self.id, 'Данная команда уже существует')
+                    return
+                bot.send_message(self.id, "Добавляем")
+                self._cmd_status = "admin_pulling_task"
+                new_one = TASK(id_of, visibility_status, group=group)
                 now = datetime.datetime.now()
                 timestamp = int(datetime.datetime.timestamp(now))
                 new_one.time_of = timestamp
@@ -433,7 +461,11 @@ class User:
             if cur_task is None:
                 bot.send_message(self.id, 'Задача не существует.')
                 return
-            bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}')
+            if (cur_task.id_of_user != self.id and cur_task.group != self.study_group and self.status != 'super_user') and cur_task.group != "None":
+                bot.send_message(self.id, 'Отказано в доступе.')
+                return
+            bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}'
+                                      f'\nГруппа: {"Публичная" if cur_task.group == "None" else cur_task.group}')
 
 
 activity = LinkedList.LinkedList()

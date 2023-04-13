@@ -68,8 +68,8 @@ def add_problem(problem: TASK, connection: sqlite3.Connection):
     """
     cur = connection.cursor()
     try:
-        cur.execute("insert into problems(problem_ID, teacher_ID, problem_situation, is_visible)"
-                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible});")
+        cur.execute("insert into problems(problem_ID, teacher_ID, problem_situation, is_visible, users_group)"
+                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible}, \"{problem.group}\");")
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new problem {e} has occured.')
@@ -90,7 +90,7 @@ def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
         res = cur.fetchall()
         if len(res) == 0:
             return None
-        res_task = TASK(id=res[0][0], visible=res[0][3], id_of_user=res[0][1], statement=res[0][2])
+        res_task = TASK(id=res[0][0], visible=res[0][3], id_of_user=res[0][1], statement=res[0][2], group=res[0][4])
         return res_task
     except Exception as e:
         print(f'[Error] While getting a problem from database {e} has occured.')
@@ -108,7 +108,8 @@ def update_problem(problem: TASK, connection: sqlite3.Connection):
     try:
         cur.execute(f"update problems "
                     f"set problem_situation = \"{problem.statement}\", "
-                    f"is_visible = {problem.visible} "
+                    f"is_visible = {problem.visible}, "
+                    f"users_group = \"{problem.group}\" "
                     f"where problem_ID = {problem.id};")
         connection.commit()
     except Exception as e:
@@ -223,6 +224,30 @@ def get_user_parcels(user_id: int, connection: sqlite3.Connection) -> list:
     try:
         cur.execute(f"select * from parcels "
                     f"where student_ID = {user_id};")
+        res = cur.fetchall()
+        if len(res) == 0:
+            return res
+        res = list(map(lambda x: Package(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4]), res))
+        return res
+    except Exception as e:
+        print(f'[Error] While searching for user\'s parcels in database {e} has occured.')
+    finally:
+        cur.close()
+
+
+def get_user_problem_parcels(user_id: int, problem_id: int, connection: sqlite3.Connection) -> list:
+    """
+    Returns a list of parcels that have been sent by this user.
+    :rtype: object
+    :param problem_id: problem's id
+    :param user_id: id of user
+    :param connection: connection to database
+    :return: list of user's parcels
+    """
+    cur = connection.cursor()
+    try:
+        cur.execute(f"select * from parcels "
+                    f"where student_ID = {user_id} and problem_ID = {problem_id};")
         res = cur.fetchall()
         if len(res) == 0:
             return res
