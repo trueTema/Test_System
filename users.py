@@ -1,15 +1,16 @@
 import datetime
 import json
+import os
 import sqlite3
 import time
 
 from telebot import types
-from enum import Enum
+import run_checker
 import LinkedList
 import database
 import telebot as tgbot
-from Task.Task import TASK
-from Package.Package import Package
+from Task import TASK
+from Parcel import Parcel
 import threading
 
 _token = json.load(open('Files/config.json', 'r'))["token"]
@@ -95,6 +96,86 @@ class User:
         self.status = status
         self.study_group = study_group
 
+    def doc_handler(self, file: bytes, filetype: str):
+        if self._cmd_status == 'pushing_checking_script':
+            if filetype != 'py':
+                bot.send_message(self.id, 'Скрипт должен быть формата .py')
+                return
+            src = f"Scripts/{str(self.cur_Task.id)}.py"
+            with open(src, "wb") as new_file:
+                new_file.write(file)
+                new_file.close()
+            connection = get_connection(threading.current_thread().native_id)
+            database.add_problem(self.cur_Task, connection)
+            self._cmd_status = None
+            self.cur_Task = None
+            bot.send_message(self.id, 'Задача успешно добавлена.')
+            return
+        if self._cmd_status == 'updating_checking_script':
+            if filetype != 'py':
+                bot.send_message(self.id, 'Скрипт должен быть формата .py')
+                return
+            os.remove(f'Scripts/{self.cur_Task.id}.py')
+            src = f"Scripts/{str(self.cur_Task.id)}.py"
+            with open(src, "wb") as new_file:
+                new_file.write(file)
+                new_file.close()
+            connection = get_connection(threading.current_thread().native_id)
+            database.update_problem(self.cur_Task, connection)
+            bot.send_message(self.id, "Задача была успешно обновлена.")
+            self.cur_Task = None
+            self._cmd_status = None
+            return
+        if self._cmd_status == "pushing_parcel":
+            if filetype != 'txt':
+                bot.send_message(self.id, 'Посылкой может быть только текстовый файл.')
+                return
+            now = datetime.datetime.now()
+            timestamp = int(datetime.datetime.timestamp(now))
+            try:
+                checker_result = run_checker.get_points(f'Scripts/{self.cur_task_id}.py', run_checker.bytes_to_str(file))
+            except Exception as e:
+                bot.send_message(self.id, 'Нетестируемый ответ.')
+                return
+            if len(checker_result["errors"]) != 0:
+                bot.send_message(self.id, 'Нетестируемый ответ.')
+                return
+            if database.get_problem(self.cur_task_id, get_connection(threading.current_thread().native_id)).visible == 1:
+                bot.send_message(self.id, f'Набрано баллов: {checker_result["points"]}')
+            current_parcell = Parcel(points=checker_result["points"],
+                                     date=timestamp, id_user=self.id, id_task=self.cur_task_id,
+                                     answer=str(file))
+            connection = get_connection(threading.current_thread().native_id)
+            database.add_parcel(current_parcell, connection)  # Sending parcell
+            self.cur_Task = None
+            self._cmd_status = None
+            bot.send_message(self.id, "Посылка была отправлена")
+            return
+        if self._cmd_status == "updating_parcell":
+            if filetype != 'txt':
+                bot.send_message(self.id, 'Посылкой может быть только текстовый файл.')
+                return
+            now = datetime.datetime.now()
+            timestamp = int(datetime.datetime.timestamp(now))
+            try:
+                checker_result = run_checker.get_points(f'Scripts/{self.cur_task_id}.py', run_checker.bytes_to_str(file))
+            except Exception as e:
+                bot.send_message(self.id, 'Нетестируемый ответ.')
+                return
+            if len(checker_result["errors"]) != 0:
+                bot.send_message(self.id, 'Нетестируемый ответ.')
+                return
+            if database.get_problem(self.cur_task_id, get_connection(threading.current_thread().native_id)).visible == 1:
+                bot.send_message(self.id, f'Набрано баллов: {checker_result["points"]}')
+            current_parcell = Parcel(points=checker_result["points"], date=timestamp, id_user=self.id, id_task=self.cur_task_id,
+                                     answer=str(file))
+            connection = get_connection(threading.current_thread().native_id)
+            database.update_parcel(current_parcell, connection)  # Updating parcell
+            bot.send_message(self.id, "Данная посылка уже существует, а поэтому обновлена")
+            self.cur_Task = None
+            self._cmd_status = None
+            return
+
     def txt_handler(self, txt: str):
         """
         Text messages handler for each user.
@@ -119,27 +200,7 @@ class User:
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
             self._cmd_status = None
             return
-        if self._cmd_status == "updating_parcell":
-            now = datetime.datetime.now()
-            timestamp = int(datetime.datetime.timestamp(now))
-            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_task_id,
-                                      answer=str(txt))
-            connection = get_connection(threading.current_thread().native_id)
-            database.update_parcel(current_parcell, connection)  # Updating parcell
-            bot.send_message(self.id, "Данная посылка уже существует, а поэтому обновлена")
-            self.cur_Task = None
-            self._cmd_status = None
-            return
-        if self._cmd_status == "pushing_parcel":
-            now = datetime.datetime.now()
-            timestamp = int(datetime.datetime.timestamp(now))
-            current_parcell = Package(points=0.0, date=timestamp, id_user=self.id, id_task=self.cur_task_id, answer=str(txt))
-            connection = get_connection(threading.current_thread().native_id)
-            database.add_parcel(current_parcell, connection)  # Sending parcell
-            self.cur_Task = None
-            self._cmd_status = None
-            bot.send_message(self.id, "Посылка была отправлена")
-            return
+
         if self._cmd_status == "admin_pulling_task":
             field_text = txt
             self.cur_Task.statement = field_text
@@ -147,24 +208,14 @@ class User:
             Adding the number sending time is necessary 
             for the possible implementation of the deadline system in the future
             """
-            connection = get_connection(threading.current_thread().native_id)
-            if database.get_problem(self.cur_Task.id, connection) is not None:
-                bot.send_message(self.id, "Задача уже добавлена ранее")
-                self._cmd_status = "updating_task"
-                return
-            database.add_problem(self.cur_Task, connection)
-            current = database.get_problem(self.cur_Task.id, connection)
-            self._cmd_status = None
-            self.cur_Task = None
+            self._cmd_status = 'pushing_checking_script'
+            bot.send_message(self.id, 'Отправьте скрипт оценки для этой задачи.')
             return
         if self._cmd_status == "updating_task":
             field_text = txt
             self.cur_Task.statement = field_text
-            connection = get_connection(threading.current_thread().native_id)
-            database.update_problem(self.cur_Task, connection)
-            bot.send_message(self.id, "Задача была успешно обновлена")
-            self.cur_Task = None
-            self._cmd_status = None
+            self._cmd_status = 'updating_checking_script'
+            bot.send_message(self.id, 'Отправьте скрипт оценки для этой задачи.')
             return
 
     def super_user_cmd(self, cmd: str):
@@ -292,9 +343,6 @@ class User:
             bot.send_message(self.id, _help_for_admin)
             return
         if cmd[:4] == 'send':
-            if self.status == "teacher" or self.status == "super_user":
-                bot.send_message(self.id, "Вы не можете отправлять посылки, т.к. вы - BigДядя")
-                return
             if len(cmd.split(" ")) != 2:
                 bot.send_message(self.id, "Вы не ввели айди номера или сделали это неправильно ")
                 return
@@ -335,10 +383,10 @@ class User:
                     group = cmd.split()[3]
                 coonection = get_connection(threading.current_thread().native_id)
                 if database.get_problem(id_of_task, coonection) is None:
-                    bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачку")
+                    bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачу")
                     return
                 if len(cmd.split(" ")) not in (3, 4):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask <ID> <visible/invisible> <group>")
+                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask <ID> <visible/invisible> [group]")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -416,7 +464,7 @@ class User:
             if self.status == "teacher" or self.status == "super_user":
                 coonection = get_connection(threading.current_thread().native_id)
                 if len(cmd.split(" ")) not in (3, 4):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> <group>")
+                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> [group]")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -437,7 +485,7 @@ class User:
                     visibility_status = 0
                 cur_task = database.get_problem(id_of, coonection)
                 if cur_task is not None:
-                    bot.send_message(self.id, 'Данная команда уже существует')
+                    bot.send_message(self.id, 'Данная задача уже существует.')
                     return
                 bot.send_message(self.id, "Добавляем")
                 self._cmd_status = "admin_pulling_task"

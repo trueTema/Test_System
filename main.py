@@ -1,10 +1,6 @@
 import json
 import signal
 
-from telebot import types
-
-import Package.Package
-import Task.Task
 import database
 import users
 import threading
@@ -93,7 +89,7 @@ def main():
             users.bot.reply_to(message, "Некорректный формат данных")
             return
         download = users.bot.download_file(file_info.file_path)
-        users.cache[user_id].data[1].txt_handler(download)
+        users.cache[user_id].data[1].doc_handler(download, type_of_file)
         return
 
     users.bot.polling(non_stop=True)

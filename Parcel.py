@@ -1,7 +1,7 @@
 import datetime
 
 
-class Package:
+class Parcel:
 
     def __init__(self, points: float, id_user: int, id_task: int, date: int, answer: str = ''):
         self.id_user = id_user
