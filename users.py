@@ -285,7 +285,11 @@ class User:
             except ...:
                 bot.send_message(self.id, 'Некорректный формат команды.')
                 return
-            if cache[user_id].data[1].status == 'super_user' and (self.id != 451938981):
+            if user_id in cache.keys():
+                user = cache[user_id].data[1]
+            else:
+                user = database.get_user(user_id, get_connection(threading.current_thread().native_id))
+            if user is not None and user.status == 'super_user' and (self.id != 451938981):
                 bot.send_message(self.id, 'Невозможно заблокировать суперпользователя.')
                 return
             if user_id == self.id:
@@ -453,11 +457,12 @@ class User:
             if len(parcels_list) == 0:
                 bot.send_message(self.id, "У вас ещё нет посылок.")
                 return
+            is_visible = True if database.get_problem(problem_id, get_connection(threading.current_thread().native_id)).visible == 1 else False
             parcels_list.sort(key=lambda x: x.date)
             res = 'Ваши посылки:\n\nНомер\Баллы\Время отправки\n'
             for i in range(len(parcels_list)):
                 date = datetime.datetime.utcfromtimestamp(parcels_list[i].date).strftime('%Y-%m-%d %H:%M:%S')
-                res += f'[{i+1}]' + ' ' + f'{parcels_list[i].points}' + ' ' + f'{date}\n'
+                res += f'[{i+1}]' + ' ' + f'{parcels_list[i].points if is_visible else "Баллы скрыты"}' + ' ' + f'{date}\n'
             bot.send_message(self.id, res)
 
         if cmd[:7] == "addTask":
