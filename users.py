@@ -51,6 +51,7 @@ _help_for_admin = "Список команд для учителя\n\n" \
                   "deleteGroup - удалить группу\n" \
                   "getTask - получить номер\n" \
                   "exit - смена статуса на ученика\n" \
+                  "statics id - получить статистику по задаче\n" \
  \
 """
 Some description for Super User commands
@@ -319,6 +320,18 @@ class User:
         Command handler for each user
         :param cmd: command
         """
+
+        def sorting_of_parcels(list_of_pars):
+            """
+            Function for sorting the package by points and time
+            :param list_of_pars: list_of_pacels
+            :return: sorted list of parcels
+            """
+            from operator import itemgetter
+            arr = [(i.id_user, i.points, i.date) for i in list_of_pars]
+            arr.sort(key=itemgetter(1, 2), reverse=True)
+            return arr
+
         if self.id in banned_users:
             bot.send_message(self.id, 'Вы заблокированы.')
             return
@@ -503,6 +516,24 @@ class User:
                 return
             else:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
+        if cmd[:7] == "statics":
+            if statuses[self.status] == 0:
+                bot.send_message(self.id, "У вас нет доступа к этой команде")
+                return
+            coonection = get_connection(threading.current_thread().native_id)
+            id_of_task = int(cmd.split(" ")[1])
+            list_of_chosen_id = database.get_problem_parcels(id_of_task, coonection)
+            if len(list_of_chosen_id) == 0:
+                bot.send_message(self.id, "Для данной задачи не было отправлено ни одного решения")
+                return
+            arr = sorting_of_parcels(list_of_chosen_id)
+            string_of_exit = ""
+            for j in arr:
+                id_of_user = j.id_user #What is the problem?
+                cur_user = database.get_user(id_of_user, coonection)
+                string_of_exit += f"ID пользователя{str(id_of_user)} его имя: {str(cur_user.name)} полученные баллы {str(j.points)}\n"
+            bot.send_message(self.id, string_of_exit)
+            return
         if cmd[:7] == 'getTask':
             cmd = cmd.split()[1:]
             try:
