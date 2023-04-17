@@ -272,7 +272,7 @@ def get_problem_parcels(problem_id: int, connection: sqlite3.Connection) -> list
         res = cur.fetchall()
         if len(res) == 0:
             return res
-        res = list(map(lambda x: Parcel(id_user=x[0], id_task=x[1], points=x[2], answer=x[3], date=x[4]), res))
+        res = list(map(lambda x: Parcel(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4]), res))
         return res
     except Exception as e:
         print(f'[Error] While searching for problem\'s parcels in database {e} has occured.')
