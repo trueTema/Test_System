@@ -459,6 +459,9 @@ class User:
                 if len(cmd.split(" ")) == 1:
                     bot.send_message(self.id, "Вы не ввели ID задачи")
                     return
+                if str(cmd.split(" ")[1]).isdigit() == False:
+                    bot.send_message(self.id,"ID должно быть числом")
+                    return
                 id_of_task = int(cmd.split(" ")[1])
                 connection = get_connection(threading.current_thread().native_id)
                 if database.get_problem(id_of_task, connection) is not None:
