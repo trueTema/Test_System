@@ -541,6 +541,9 @@ class User:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
                 return
             connection = get_connection(threading.current_thread().native_id)
+            if str(cmd.split(" ")[1]).isdigit() == False:
+                bot.send_message(self.id, "ID должно быть числом")
+                return
             id_of_task = int(cmd.split(" ")[1])
             list_of_chosen_id = database.get_problem_parcels(id_of_task, connection)
             if len(list_of_chosen_id) == 0:
