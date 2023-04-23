@@ -536,7 +536,10 @@ class User:
             string_of_exit = ""
             for j in list_of_chosen_id:
                 id_of_user = j.id_user  # What is the problem?
-                cur_user = database.get_user(id_of_user, connection)
+                if id_of_user in cache.keys():
+                    cur_user = cache[id_of_user].data[1]
+                else:
+                    cur_user = database.get_user(id_of_user, connection)
                 string_of_exit += f"ID пользователя: {id_of_user} \nИмя: {cur_user.name} \nПолученные баллы {j.points} \
                 \nВремя отправки: {datetime.datetime.utcfromtimestamp(j.date).strftime('%Y-%m-%d %H:%M:%S')}\n====================\n"
             bot.send_message(self.id, string_of_exit)
