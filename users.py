@@ -31,6 +31,7 @@ banned_users = set()
 Admin login will be initialized with a hiden command - /adminLog key_word
 """
 
+
 _help = "Список доступных команд:\n\n" \
         "help - просмотр списка команд\n" \
         "report <текст обращения> - сообщить об ошибке\n" \

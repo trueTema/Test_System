@@ -13,6 +13,7 @@ parcels (
     sending_time big_int check(sending_time > 0)
 )
 
+
 problems (
     problem_ID int primary key
     teacher_ID int not null check(teacher_ID > 0) unique

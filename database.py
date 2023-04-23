@@ -28,6 +28,7 @@ def update_parcel(parcel: Parcel, connection: sqlite3.Connection):
     :param parcel: parcel that we need to update
     :param connection: connection to database
     """
+
     cur = connection.cursor()
     try:
         cur.execute("update parcels "
