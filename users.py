@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import random
 import sqlite3
 import time
 
@@ -41,7 +40,7 @@ _help = "Список доступных команд:\n\n" \
 List of commands for teacher which will be in his own "special" help
 """
 _help_for_admin = "Список команд для учителя\n" \
-                  "addTask id visible\invisible (deadline)dd.MM.YYYY-HH:mm- добавить задачку\n" \
+                  "addTask id visible\invisible - добавить задачку\n" \
                   "deleteTask id - удалить задачку\n" \
                   "updateTask id - обновить задачу\n" \
                   "addGroup - добавить группу\n" \
@@ -322,28 +321,21 @@ class User:
         :param cmd: command
         """
 
-        def sorting_of_parcels(list_of_pars,fst,lst):
+        def sorting_of_parcels(list_of_pars):
             """
             Function for sorting the package by points and time
             :param list_of_pars: list_of_pacels
             :return: sorted list of parcels
             """
-            # if fst >= lst:
-            #     return
-            # i,j = fst,lst
-            # pivot = list_of_pars[random.randint(fst,lst)]
-            #
-            # while i<=j:
-            #
-            # for i in range(len(list_of_pars)):
-            #     for j in range(len(list_of_pars)-i-1):
-            #         if list_of_pars[j].points < list_of_pars[j+1].points:
-            #             list_of_pars[j], list_of_pars[j+1] = list_of_pars[j+1], list_of_pars[j]
-            #         if list_of_pars[j].points == list_of_pars[j+1].points:
-            #             if list_of_pars[j].date > list_of_pars[j+1].date:
-            #                 list_of_pars[j], list_of_pars[j + 1] = list_of_pars[j + 1], \
-            #                                                        list_of_pars[j]
-            # return list_of_pars
+            for i in range(len(list_of_pars)):
+                for j in range(len(list_of_pars)-i-1):
+                    if list_of_pars[j].points < list_of_pars[j+1].points:
+                        list_of_pars[j], list_of_pars[j+1] = list_of_pars[j+1], list_of_pars[j]
+                    if list_of_pars[j].points == list_of_pars[j+1].points:
+                        if list_of_pars[j].date > list_of_pars[j+1].date:
+                            list_of_pars[j], list_of_pars[j + 1] = list_of_pars[j + 1], \
+                                                                   list_of_pars[j]
+            return list_of_pars
 
         if self.id in banned_users:
             bot.send_message(self.id, 'Вы заблокированы.')
@@ -386,12 +378,6 @@ class User:
             connection = get_connection(threading.current_thread().native_id)
             if database.get_problem(id_of_parcell, connection) is None:
                 bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
-                return
-            required_task = database.get_problem(id_of_parcell, connection)
-            now = datetime.datetime.now()
-            deadline = required_task.deadline
-            if (now.time() > deadline.time()):
-                bot.send_message(self.id,"Вы больше не можете отправлять\обновлять решение данной задачи")
                 return
             list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, connection)
             if len(list_of_parcels) == 0:
@@ -515,8 +501,8 @@ class User:
         if cmd[:7] == "addTask":
             if self.status == "teacher" or self.status == "super_user":
                 connection = get_connection(threading.current_thread().native_id)
-                if len(cmd.split(" ")) not in (4, 5):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> dead_line [group]")
+                if len(cmd.split(" ")) not in (3, 4):
+                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> [group]")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -529,11 +515,6 @@ class User:
                 if str(cmd.split(" ")[1]).isdigit() == False:
                     bot.send_message(self.id,"ID должно быть числом")
                     return
-                if str(cmd.split(" ")[3]).isdigit() == True:
-                    bot.send_message(self.id, "Вы не ввели дату дедлайна")
-                    return
-                string_of_date = str(cmd.split(" ")[3])
-                deadline = datetime.datetime.strptime(string_of_date, "%d.%m.%Y-%H:%M")
                 id_of = int(str(cmd.split(" ")[1]))
                 if len(cmd.split()) < 4:
                     group = "None"
@@ -551,13 +532,8 @@ class User:
                 self._cmd_status = "admin_pulling_task"
                 new_one = TASK(id_of, visibility_status, group=group)
                 now = datetime.datetime.now()
-                if now.time()>deadline.time():
-                    bot.send_message(self.id, "Данный дедлайн некорректный")
-                    return
                 timestamp = int(datetime.datetime.timestamp(now))
-                timestamp_sec = int(datetime.datetime.timestamp(deadline))
                 new_one.time_of = timestamp
-                new_one.deadline =timestamp_sec
                 new_one.id_of_user = self.id
                 self.cur_Task = new_one
                 return
@@ -577,10 +553,7 @@ class User:
             if len(list_of_chosen_id) == 0:
                 bot.send_message(self.id, "Для данной задачи не было отправлено ни одного решения")
                 return
-            arr=sorted(list_of_chosen_id, key=attrgetter("date"))
-            sorted(arr, key=attrgetter("points"),reverse=True)
-            bot.send_message(self.id, str(arr))
-            return
+            arr = sorting_of_parcels(list_of_chosen_id)
             string_of_exit = ""
             for j in arr:
                 bot.send_message(self.id, j.id_user)
@@ -605,8 +578,7 @@ class User:
                 bot.send_message(self.id, 'Отказано в доступе.')
                 return
             bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}'
-                                      f'\nГруппа: {"Публичная" if cur_task.group == "None" else cur_task.group}'
-                                      f'\nВремя дедлайна: {cur_task.dead_line}')
+                                      f'\nГруппа: {"Публичная" if cur_task.group == "None" else cur_task.group}')
 
 
 activity = LinkedList.LinkedList()

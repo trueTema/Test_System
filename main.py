@@ -37,7 +37,7 @@ def init():
 def main():
     """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'profile', 'su', "adminLog", "adminHelp", "exit",
-                "addTask", "addScript", "deleteTask", "updateTask", "getTask", "status", "statics"
+                "addTask", "addScript", "deleteTask", "updateTask", "getTask", "status", "stats"
                 ]
 
     #  starting cleaning cache
