@@ -33,23 +33,23 @@ Admin login will be initialized with a hiden command - /adminLog key_word
 
 _help = "Список доступных команд:\n\n" \
         "help - просмотр списка команд\n" \
-        "report <текст обращения> - сообщить об ошибке\n" \
-        "send <номер задачи> - отправить решение на проверку\n" \
-        "status - получить информацию о своих текущих баллах за задачи"
+        "send <ID> - отправить решение на проверку\n" \
+        "status <ID> - получить информацию о своих текущих баллах за задачу\n" \
+        "profile - получить информацию о своём профиле\n" \
+        "getTask <ID> - получить задачу по ID\n" \
+        "\n===============\nКоманды для учителя:\n" \
+        "updateTask <ID> <visible/invisible> [Группа] - обновить задачу\n" \
+        "deleteTask <ID> - удалить задачку\n" \
+        "addTask <id> <visible\invisible> [Группа] - добавить задачу\n" \
+        "exit - смена статуса на ученика\n" \
+        "stats <ID> - получить статистику по задаче\n" \
+        "\n===============\nКоманды для суперпользователя:\n" \
+        "ban <ID> - заблокировать пользователя\n" \
+        "unban <ID> - разблокировать пользователя\n" \
+        "changeName/changeStatus/changeGroup <ID> <Имя/Статус/Группа> - изменить имя, статус, группу пользователя\n"
 """
 List of commands for teacher which will be in his own "special" help
-"""
-_help_for_admin = "Список команд для учителя\n" \
-                  "addTask id visible\invisible - добавить задачку\n" \
-                  "deleteTask id - удалить задачку\n" \
-                  "updateTask id - обновить задачу\n" \
-                  "addGroup - добавить группу\n" \
-                  "deleteGroup - удалить группу\n" \
-                  "getTask - получить номер\n" \
-                  "exit - смена статуса на ученика\n" \
-                  "statics id - получить статистику по задаче\n" \
- \
-                  """
+
 Some description for Super User commands
 Commands like 'add/deleteTask' don't need to be explained
 'add\deleteGroup' needs for cases like: User enters group, which doesn't exist and we throw error\exception
@@ -136,7 +136,7 @@ class User:
                 bot.send_message(self.id, 'Нетестируемый ответ.')
                 return
             if len(checker_result["errors"]) != 0:
-                bot.send_message(self.id, 'Нетестируемый ответ.')
+                bot.send_message(self.id, checker_result["errors"])
                 return
             if database.get_problem(self.cur_task_id,
                                     get_connection(threading.current_thread().native_id)).visible == 1:
@@ -165,14 +165,17 @@ class User:
             if len(checker_result["errors"]) != 0:
                 bot.send_message(self.id, 'Нетестируемый ответ.')
                 return
-            if database.get_problem(self.cur_task_id,
-                                    get_connection(threading.current_thread().native_id)).visible == 1:
-                bot.send_message(self.id, f'Набрано баллов: {checker_result["points"]}')
+
             current_parcell = Parcel(points=checker_result["points"], date=timestamp, id_user=self.id,
                                      id_task=self.cur_task_id,
                                      answer=str(file))
             connection = get_connection(threading.current_thread().native_id)
             database.update_parcel(current_parcell, connection)  # Updating parcell
+            if database.get_problem(self.cur_task_id,
+                                    get_connection(threading.current_thread().native_id)).visible == 1:
+                bot.send_message(self.id, f'Посылка была отправлена. \nНабрано баллов: {checker_result["points"]}')
+            else:
+                bot.send_message(self.id, "Посылка была отправлена.")
             self.cur_Task = None
             self._cmd_status = None
             return
@@ -210,7 +213,7 @@ class User:
             for the possible implementation of the deadline system in the future
             """
             self._cmd_status = 'pushing_checking_script'
-            bot.send_message(self.id, 'Отправьте скрипт оценки для этой задачи.')
+            bot.send_message(self.id, 'Отправьте скрипт проверки для этой задачи.')
             return
         if self._cmd_status == "updating_task":
             field_text = txt
@@ -244,6 +247,7 @@ class User:
                     bot.send_message(self.id, 'Невозможно поменять статус суперпользователя.')
                     return
                 cache[user_id].data[1].status = new_status
+                bot.send_message(self.id, f'Статус пользователя {user_id} успешно изменён на {new_status}')
             return
         if cmd[0] == 'changeName':
             user_id = int(cmd[1])
@@ -321,22 +325,6 @@ class User:
         :param cmd: command
         """
 
-        def sorting_of_parcels(list_of_pars):
-            """
-            Function for sorting the package by points and time
-            :param list_of_pars: list_of_pacels
-            :return: sorted list of parcels
-            """
-            for i in range(len(list_of_pars)):
-                for j in range(len(list_of_pars)-i-1):
-                    if list_of_pars[j].points < list_of_pars[j+1].points:
-                        list_of_pars[j], list_of_pars[j+1] = list_of_pars[j+1], list_of_pars[j]
-                    if list_of_pars[j].points == list_of_pars[j+1].points:
-                        if list_of_pars[j].date > list_of_pars[j+1].date:
-                            list_of_pars[j], list_of_pars[j + 1] = list_of_pars[j + 1], \
-                                                                   list_of_pars[j]
-            return list_of_pars
-
         if self.id in banned_users:
             bot.send_message(self.id, 'Вы заблокированы.')
             return
@@ -361,30 +349,24 @@ class User:
         if cmd == 'help':
             bot.send_message(self.id, _help)
             return
-        if cmd == "adminHelp" and statuses[self.status] >= 1:  # Output a special keyboard for the teacher
-            bot.send_message(self.id, _help_for_admin)
-            return
         if cmd[:4] == 'send':
             if len(cmd.split(" ")) != 2:
                 bot.send_message(self.id, "Вы не ввели айди номера или сделали это неправильно ")
                 return
-            if statuses[self.status] >= 1:
-                bot.send_message(self.id, "С вашим статусом, Вы не можете отправлять посылки")
-                return
             id_of_parcell = int(cmd.split(" ")[1])
             connection = get_connection(threading.current_thread().native_id)
             if database.get_problem(id_of_parcell, connection) is None:
-                bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
+                bot.send_message(self.id, "Вы пытаетесь отправить решение для несуещствующей задачи")
                 return
             list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, connection)
             if len(list_of_parcels) == 0:
                 self._cmd_status = "pushing_parcel"
                 self.cur_task_id = id_of_parcell
-                bot.send_message(self.id, "Отправка", reply_markup=kb)
+                bot.send_message(self.id, "Отправьте файл с ответом.", reply_markup=kb)
             else:
                 self._cmd_status = "updating_parcell"
                 self.cur_task_id = id_of_parcell
-                bot.send_message(self.id, "Обновление посылки")
+                bot.send_message(self.id, "Отправьте файл с ответом.")
             return
         if cmd[:8] == "adminLog":  # Login as admin
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
@@ -398,39 +380,43 @@ class User:
             return
         if cmd[:10] == "updateTask":
             if statuses[self.status] == 0:
-                bot.send_message(self.id, "У вас нет прав для этой команды")
+                bot.send_message(self.id, "Ошибка доступа.")
                 return
             else:
+                if not cmd.split(" ")[1].isdigit():
+                    bot.send_message(self.id, "ID должно быть числом")
+                    return
                 id_of_task = int(cmd.split(" ")[1])
                 if len(cmd.split()) < 4:
                     group = "None"
                 else:
                     group = cmd.split()[3]
                 connection = get_connection(threading.current_thread().native_id)
-                if database.get_problem(id_of_task, connection) is None:
-                    bot.send_message(self.id, "Вы пытаетесь обновить несущеуствующую задачу")
+                problem = database.get_problem(id_of_task, connection)
+                if problem is None:
+                    bot.send_message(self.id, "Вы пытаетесь обновить несуществующую задачу")
+                    return
+                if problem.id_of_user != self.id and self.status == 'teacher':
+                    bot.send_message(self.id, "Ошибка доступа.")
                     return
                 if len(cmd.split(" ")) not in (3, 4):
                     bot.send_message(self.id, "Комнда должна быть в виде: /updateTask <ID> <visible/invisible> [group]")
                     return
-                while True:
-                    visibility_status = str(cmd.split(" ")[2])
-                    if visibility_status not in ["visible", "invisible"]:
-                        bot.send_message(self.id, "Некорректный формат статуса")
-                        return
-                    else:
-                        if visibility_status == "visible":
-                            visibility_status = 1
-                        else:
-                            visibility_status = 0
-                        break
+                visibility_status = str(cmd.split(" ")[2])
+                if visibility_status not in ["visible", "invisible"]:
+                    bot.send_message(self.id, "Некорректный формат статуса")
+                    return
+                if visibility_status == "visible":
+                    visibility_status = 1
+                else:
+                    visibility_status = 0
                 current_task = database.get_problem(id_of_task, connection)
                 current_task.visible = visibility_status
                 current_task.group = group
                 now = datetime.datetime.now()
                 timestamp = int(datetime.datetime.timestamp(now))
                 current_task.time_of = timestamp
-                bot.send_message(self.id, "Обновление таска")
+                bot.send_message(self.id, "Отправьте условие задачи.")
                 self.cur_Task = current_task
                 self._cmd_status = "updating_task"
                 return
@@ -452,9 +438,16 @@ class User:
                 if len(cmd.split(" ")) == 1:
                     bot.send_message(self.id, "Вы не ввели ID задачи")
                     return
+                if not cmd.split(" ")[1].isdigit():
+                    bot.send_message(self.id, "ID должно быть числом")
+                    return
                 id_of_task = int(cmd.split(" ")[1])
                 connection = get_connection(threading.current_thread().native_id)
-                if database.get_problem(id_of_task, connection) is not None:
+                problem = database.get_problem(id_of_task, connection)
+                if problem is not None:
+                    if problem.id_of_user != self.id and self.status == 'teacher':
+                        bot.send_message(self.id, "Ошибка доступа.")
+                        return
                     database.delete_problem(id_of_task, connection)
                     bot.send_message(self.id, f"Задача под индексом {id_of_task} была удалена")
                     return
@@ -462,7 +455,7 @@ class User:
                     bot.send_message(self.id, "Данной команды нет в базе данных")
                     return
             else:
-                bot.send_message(self.id, "У вас нет доступа к этой команде")
+                bot.send_message(self.id, "Ошибка доступа.")
                 return
         if cmd[:6] == 'status':
             cmd = cmd.split()
@@ -515,7 +508,7 @@ class User:
                 if cur_task is not None:
                     bot.send_message(self.id, 'Данная задача уже существует.')
                     return
-                bot.send_message(self.id, "Добавляем")
+                bot.send_message(self.id, "Отправьте условие задачи.")
                 self._cmd_status = "admin_pulling_task"
                 new_one = TASK(id_of, visibility_status, group=group)
                 now = datetime.datetime.now()
@@ -525,24 +518,27 @@ class User:
                 self.cur_Task = new_one
                 return
             else:
-                bot.send_message(self.id, "У вас нет доступа к этой команде")
-        if cmd[:7] == "statics":
+                bot.send_message(self.id, "Ошибка доступа.")
+        if cmd[:5] == "stats":
             if statuses[self.status] == 0:
-                bot.send_message(self.id, "У вас нет доступа к этой команде")
+                bot.send_message(self.id, "Ошибка доступа.")
                 return
             connection = get_connection(threading.current_thread().native_id)
             id_of_task = int(cmd.split(" ")[1])
+            problem = database.get_problem(id_of_task, connection)
+            if self.status == 'teacher' and problem.id_of_user != self.id:
+                bot.send_message(self.id, "Ошибка доступа.")
             list_of_chosen_id = database.get_problem_parcels(id_of_task, connection)
             if len(list_of_chosen_id) == 0:
                 bot.send_message(self.id, "Для данной задачи не было отправлено ни одного решения")
                 return
-            arr = sorting_of_parcels(list_of_chosen_id)
+            list_of_chosen_id.sort(key=lambda parcel: [parcel.points, 1**18 - parcel.date], reverse=True)
             string_of_exit = ""
-            for j in arr:
-                bot.send_message(self.id, j.id_user)
+            for j in list_of_chosen_id:
                 id_of_user = j.id_user  # What is the problem?
                 cur_user = database.get_user(id_of_user, connection)
-                string_of_exit += f"ID пользователя {str(id_of_user)} его имя: {str(cur_user.name)} полученные баллы {str(j.points)}\n"
+                string_of_exit += f"ID пользователя: {id_of_user} \nИмя: {cur_user.name} \nПолученные баллы {j.points} \
+                \nВремя отправки: {datetime.datetime.utcfromtimestamp(j.date).strftime('%Y-%m-%d %H:%M:%S')}\n====================\n"
             bot.send_message(self.id, string_of_exit)
             return
         if cmd[:7] == 'getTask':
@@ -556,8 +552,7 @@ class User:
             if cur_task is None:
                 bot.send_message(self.id, 'Задача не существует.')
                 return
-            if (
-                    cur_task.id_of_user != self.id and cur_task.group != self.study_group and self.status != 'super_user') and cur_task.group != "None":
+            if (cur_task.id_of_user != self.id and cur_task.group != self.study_group and self.status != 'super_user') and cur_task.group != "None":
                 bot.send_message(self.id, 'Отказано в доступе.')
                 return
             bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}'
