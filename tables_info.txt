@@ -19,5 +19,6 @@ problems (
     problem_situation text
     is_visible int check(is_visible in (0, 1)) default 1
     group varchar(32)
+    deadline int not null check(deadline >0)
 )
 
