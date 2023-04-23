@@ -371,6 +371,9 @@ class User:
             if statuses[self.status] >= 1:
                 bot.send_message(self.id, "С вашим статусом, Вы не можете отправлять посылки")
                 return
+            if str(cmd.split(" ")[1]).isdigit() == False:
+                bot.send_message(self.id, "ID должно быть числом")
+                return
             id_of_parcell = int(cmd.split(" ")[1])
             connection = get_connection(threading.current_thread().native_id)
             if database.get_problem(id_of_parcell, connection) is None:
@@ -401,6 +404,9 @@ class User:
                 bot.send_message(self.id, "У вас нет прав для этой команды")
                 return
             else:
+                if str(cmd.split(" ")[1]).isdigit() == False:
+                    bot.send_message(self.id,"ID должно быть числом")
+                    return
                 id_of_task = int(cmd.split(" ")[1])
                 if len(cmd.split()) < 4:
                     group = "None"
@@ -447,10 +453,14 @@ class User:
                 return
             else:
                 bot.send_message(self.id, "У вас нет доступа к данной команде")
+                return
         if cmd[:10] == "deleteTask":
             if self.status == "teacher" or self.status == "super_user":
                 if len(cmd.split(" ")) == 1:
                     bot.send_message(self.id, "Вы не ввели ID задачи")
+                    return
+                if str(cmd.split(" ")[1]).isdigit() == False:
+                    bot.send_message(self.id,"ID должно быть числом")
                     return
                 id_of_task = int(cmd.split(" ")[1])
                 connection = get_connection(threading.current_thread().native_id)
@@ -502,6 +512,9 @@ class User:
                         return
                     else:
                         break
+                if str(cmd.split(" ")[1]).isdigit() == False:
+                    bot.send_message(self.id,"ID должно быть числом")
+                    return
                 id_of = int(str(cmd.split(" ")[1]))
                 if len(cmd.split()) < 4:
                     group = "None"
@@ -531,6 +544,10 @@ class User:
                 bot.send_message(self.id, "У вас нет доступа к этой команде")
                 return
             connection = get_connection(threading.current_thread().native_id)
+            if str(cmd.split(" ")[1]).isdigit() == False:
+                bot.send_message(self.id, "ID должно быть числом")
+                return
+
             id_of_task = int(cmd.split(" ")[1])
             list_of_chosen_id = database.get_problem_parcels(id_of_task, connection)
             if len(list_of_chosen_id) == 0:
