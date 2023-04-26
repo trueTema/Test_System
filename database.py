@@ -3,7 +3,7 @@ import users
 import Task
 from Task import TASK
 from Parcel import Parcel
-
+import db_problems
 
 def add_parcel(parcel: Parcel, connection: sqlite3.Connection):
     """
@@ -68,9 +68,8 @@ def add_problem(problem: TASK, connection: sqlite3.Connection):
     """
     cur = connection.cursor()
     try:
-        cur.execute("insert into problems(problem_ID, teacher_ID, problem_situation, is_visible, users_group, deadline)"
-                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible}, "
-                    f"\"{problem.deadline}\", \"{problem.group}\");")
+        cur.execute("INSERT INTO problems(problem_ID, teacher_ID, problem_situation, is_visible, deadline,users_group) "
+                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible},{problem.deadline}, \"{problem.group}\");")
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new problem {e} has occurred.')

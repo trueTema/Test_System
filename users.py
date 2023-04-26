@@ -69,7 +69,7 @@ def get_connection(thread_id: int) -> sqlite3.Connection:
     """
     if thread_id in connections.keys():
         return connections[thread_id]
-    connection = sqlite3.connect("Files/database.sql")
+    connection = sqlite3.connect("sqlite.db")
     connections[thread_id] = connection
     return connection
 
@@ -103,6 +103,9 @@ class User:
                 new_file.write(file)
                 new_file.close()
             connection = get_connection(threading.current_thread().native_id)
+            # bot.send_message(self.id,self.cur_Task.id)
+            # bot.send_message(self.id, self.cur_Task.statement)
+            # bot.send_message(self.id, str(self.cur_Task.deadline))
             database.add_problem(self.cur_Task, connection)
             self._cmd_status = None
             self.cur_Task = None
@@ -360,7 +363,8 @@ class User:
                 return
             now = datetime.datetime.now()
             chosen_task = database.get_problem(id_of_parcell, connection)
-            if (chosen_task.deadline.date() > now.date()):
+            time_of_task =  datetime.datetime.fromtimestamp(chosen_task.deadline)
+            if (time_of_task.date() > now.date()):
                 bot.send_message(self.id, "Ответы для данной задачи уже не принимаются")
                 return
             list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, connection)
@@ -523,10 +527,10 @@ class User:
                     return
                 bot.send_message(self.id, "Отправьте условие задачи.")
                 self._cmd_status = "admin_pulling_task"
-                new_one = TASK(id_of, visibility_status, group=group)
-                new_one.time_of = timestamp
-                new_one.id_of_user = self.id
-                new_one.deadline = timestamp_sec
+                new_one = TASK(id_of, visibility_status, group=group, time_of=timestamp, id_of_user=self.id, deadline=timestamp_sec)
+                # new_one.time_of = timestamp
+                # new_one.id_of_user = self.id
+                # new_one.deadline = timestamp_sec
                 self.cur_Task = new_one
                 return
             else:
