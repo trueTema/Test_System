@@ -18,6 +18,7 @@ problems (
     teacher_ID int not null check(teacher_ID > 0) unique
     problem_situation text
     is_visible int check(is_visible in (0, 1)) default 1
-    group varchar(32)
+    deadline int not null check(deadline >0)
+    users_group varchar(32)
 )
 

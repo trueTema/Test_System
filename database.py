@@ -3,7 +3,7 @@ import users
 import Task
 from Task import TASK
 from Parcel import Parcel
-
+import db_problems
 
 def add_parcel(parcel: Parcel, connection: sqlite3.Connection):
     """
@@ -28,6 +28,7 @@ def update_parcel(parcel: Parcel, connection: sqlite3.Connection):
     :param parcel: parcel that we need to update
     :param connection: connection to database
     """
+
     cur = connection.cursor()
     try:
         cur.execute("update parcels "
@@ -67,8 +68,8 @@ def add_problem(problem: TASK, connection: sqlite3.Connection):
     """
     cur = connection.cursor()
     try:
-        cur.execute("insert into problems(problem_ID, teacher_ID, problem_situation, is_visible, users_group)"
-                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible}, \"{problem.group}\");")
+        cur.execute("INSERT INTO problems(problem_ID, teacher_ID, problem_situation, is_visible, deadline,users_group) "
+                    f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible},{problem.deadline}, \"{problem.group}\");")
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new problem {e} has occurred.')
@@ -89,7 +90,8 @@ def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
         res = cur.fetchall()
         if len(res) == 0:
             return None
-        res_task = TASK(id=res[0][0], visible=res[0][3], id_of_user=res[0][1], statement=res[0][2], group=res[0][4])
+        res_task = TASK(id=res[0][0], visible=res[0][3], id_of_user=res[0][1], statement=res[0][2], group=res[0][5],
+                        deadline=res[0][4])
         return res_task
     except Exception as e:
         print(f'[Error] While getting a problem from database {e} has occurred.')
