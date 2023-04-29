@@ -40,7 +40,7 @@ _help = "Список доступных команд:\n\n" \
         "\n===============\nКоманды для учителя:\n" \
         "updateTask <ID> <visible/invisible> [Группа] - обновить задачу\n" \
         "deleteTask <ID> - удалить задачку\n" \
-        "addTask <id> <visible\invisible> [Группа] - добавить задачу\n" \
+        "addTask <id> <visible\invisible> dd.MM.YYYY-HH:mm(Время дедлайна) [Группа] - добавить задачу\n" \
         "exit - смена статуса на ученика\n" \
         "stats <ID> - получить статистику по задаче\n" \
         "\n===============\nКоманды для суперпользователя:\n" \
@@ -103,6 +103,9 @@ class User:
                 new_file.write(file)
                 new_file.close()
             connection = get_connection(threading.current_thread().native_id)
+            # bot.send_message(self.id,self.cur_Task.id)
+            # bot.send_message(self.id, self.cur_Task.statement)
+            # bot.send_message(self.id, str(self.cur_Task.deadline))
             database.add_problem(self.cur_Task, connection)
             self._cmd_status = None
             self.cur_Task = None
@@ -358,6 +361,12 @@ class User:
             if database.get_problem(id_of_parcell, connection) is None:
                 bot.send_message(self.id, "Вы пытаетесь отправить решение для несуещствующей задачи")
                 return
+            now = datetime.datetime.now()
+            chosen_task = database.get_problem(id_of_parcell, connection)
+            time_of_task =  datetime.datetime.fromtimestamp(chosen_task.deadline)
+            if (time_of_task < now):
+                bot.send_message(self.id, "Ответы для данной задачи уже не принимаются")
+                return
             list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, connection)
             if len(list_of_parcels) == 0:
                 self._cmd_status = "pushing_parcel"
@@ -369,6 +378,9 @@ class User:
                 bot.send_message(self.id, "Отправьте файл с ответом.")
             return
         if cmd[:8] == "adminLog":  # Login as admin
+            if statuses[self.status] > 0 :
+                bot.send_message(self.id,"Вы уже имеете статус учителя")
+                return
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
                 kb1 = kb.add(types.KeyboardButton(text="/adminHelp"))
                 bot.send_message(self.id, f"Добро пожаловать, {self.name}!",
@@ -484,8 +496,8 @@ class User:
         if cmd[:7] == "addTask":
             if self.status == "teacher" or self.status == "super_user":
                 connection = get_connection(threading.current_thread().native_id)
-                if len(cmd.split(" ")) not in (3, 4):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> [group]")
+                if len(cmd.split(" ")) not in (4, 5):
+                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> dd.mm.YYYY-HH:MM [group] ")
                     return
                 while True:
                     visibility_status = str(cmd.split(" ")[2])
@@ -496,10 +508,18 @@ class User:
                     else:
                         break
                 id_of = int(str(cmd.split(" ")[1]))
-                if len(cmd.split()) < 4:
+                string_of_date = str(cmd.split(" ")[3])
+                date_of_death = datetime.datetime.strptime(string_of_date, "%d.%m.%Y-%H:%M")
+                timestamp_sec = int(datetime.datetime.timestamp(date_of_death))
+                now = datetime.datetime.now()
+                if now > date_of_death:
+                    bot.send_message(self.id, "Вы пытаетесь установить невозможный дедлайн")
+                    return
+                timestamp = int(datetime.datetime.timestamp(now))
+                if len(cmd.split()) < 5:
                     group = "None"
                 else:
-                    group = cmd.split()[3]
+                    group = cmd.split()[4]
                 if visibility_status == "visible":
                     visibility_status = 1
                 else:
@@ -510,11 +530,7 @@ class User:
                     return
                 bot.send_message(self.id, "Отправьте условие задачи.")
                 self._cmd_status = "admin_pulling_task"
-                new_one = TASK(id_of, visibility_status, group=group)
-                now = datetime.datetime.now()
-                timestamp = int(datetime.datetime.timestamp(now))
-                new_one.time_of = timestamp
-                new_one.id_of_user = self.id
+                new_one = TASK(id_of, visibility_status, group=group, time_of=timestamp, id_of_user=self.id, deadline=timestamp_sec)
                 self.cur_Task = new_one
                 return
             else:
