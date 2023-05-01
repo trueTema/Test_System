@@ -12,3 +12,4 @@ class TASK:
         self.statement = statement
         self.visible = visible
         self.deadline = deadline
+

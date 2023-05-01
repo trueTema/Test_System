@@ -218,12 +218,84 @@ class User:
             self._cmd_status = 'pushing_checking_script'
             bot.send_message(self.id, 'Отправьте скрипт проверки для этой задачи.')
             return
-        if self._cmd_status == "updating_task":
+
+        if self._cmd_status == "updating_of_visibility":
             field_text = txt
-            self.cur_Task.statement = field_text
-            self._cmd_status = 'updating_checking_script'
-            bot.send_message(self.id, 'Отправьте скрипт оценки для этой задачи.')
+            new_visible = 0
+            if field_text == "No":
+                self._cmd_status = "updating_of_deadline"
+                bot.send_message(self.id,
+                                 "Вы хотите обновить дату дедлайна? Если нет - напишите No, в противном случае - новую дату")
+                return
+            elif field_text == "visible":
+                new_visible = 1
+            else:
+                new_visible = 0
+            self.cur_Task.visible = new_visible
+            self._cmd_status = "updating_of_deadline"
+            bot.send_message(self.id,
+                             "Вы хотите обновить дату дедлайна? Если нет - напишите No, в противном случае - новую дату")
             return
+
+        if self._cmd_status == "updating_of_deadline":
+            field_text = txt
+            if field_text == "No":
+                bot.send_message(self.id,
+                                 "Вы хотите обновить\добавить группу? Если нет - напишите No, в противном случае - новую группу")
+                self._cmd_status="updating_of_group"
+                return
+            else:
+                date_of_death = datetime.datetime.strptime(field_text, "%d.%m.%Y-%H:%M")
+                now = datetime.datetime.now()
+                if now > date_of_death:
+                    bot.send_message(self.id, "Вы пытаетесь установить невозможный дедлайн")
+                    return
+                else:
+                    timestamp_sec = int(datetime.datetime.timestamp(date_of_death))
+                    self.cur_Task.deadline = timestamp_sec
+                    bot.send_message(self.id,
+                                     "Вы хотите обновить\добавить группу? Если нет - напишите No, в противном случае - новую группу")
+                    self._cmd_status = "updating_of_group"
+                    return
+
+        if self._cmd_status == "updating_of_group":
+            field_text = txt
+            if field_text == 'No':
+                bot.send_message(self.id,"Вы хотите обновить условие задачи? Если нет - напишите No, в противном случае - новое условие")
+                self._cmd_status = "updating_of_statement"
+                return
+            else:
+                self.cur_Task.group=field_text
+                bot.send_message(self.id, "Вы хотите обновить условие задачи? Если нет - напишите No, в противном случае - новое условие")
+                self._cmd_status = "updating_of_statement"
+                return
+
+        if self._cmd_status == "updating_of_statement":
+            field_text = txt
+            if field_text == 'No':
+                bot.send_message(self.id,"Вы хотите обновить скрипт проверки? Если нет - напишите No, в противном случае - прикрепите новый скрипт")
+                self._cmd_status = "updating_checking_script_answer"
+                return
+            else:
+                self.cur_Task.statement = field_text
+                bot.send_message(self.id, "Вы хотите обновить скрипт проверки? Если нет - напишите No, в противном случае - прикрепите новый скрипт")
+                self._cmd_status = "updating_checking_script_answer"
+                return
+        if self._cmd_status == "updating_checking_script_answer":
+            field_text = txt
+            if field_text == 'No':
+                connection = get_connection(threading.current_thread().native_id)
+                database.update_problem(self.cur_Task, connection)
+                bot.send_message(self.id, "Задача была успешно обновлена")
+                self.cur_Task = None
+                self._cmd_status = None
+                return
+            else:
+                self._cmd_status = "updating_checking_script"
+                return
+
+
+
 
     def super_user_cmd(self, cmd: str):
         """
@@ -395,42 +467,22 @@ class User:
                 bot.send_message(self.id, "Ошибка доступа.")
                 return
             else:
+                if len(cmd.split()) > 2:
+                    bot.send_message(self.id, "Команда должна быть в виде /updateTask <ID>")
+                    return
                 if not cmd.split(" ")[1].isdigit():
                     bot.send_message(self.id, "ID должно быть числом")
                     return
                 id_of_task = int(cmd.split(" ")[1])
-                if len(cmd.split()) < 4:
-                    group = "None"
-                else:
-                    group = cmd.split()[3]
                 connection = get_connection(threading.current_thread().native_id)
                 problem = database.get_problem(id_of_task, connection)
                 if problem is None:
                     bot.send_message(self.id, "Вы пытаетесь обновить несуществующую задачу")
                     return
-                if problem.id_of_user != self.id and self.status == 'teacher':
-                    bot.send_message(self.id, "Ошибка доступа.")
-                    return
-                if len(cmd.split(" ")) not in (3, 4):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /updateTask <ID> <visible/invisible> [group]")
-                    return
-                visibility_status = str(cmd.split(" ")[2])
-                if visibility_status not in ["visible", "invisible"]:
-                    bot.send_message(self.id, "Некорректный формат статуса")
-                    return
-                if visibility_status == "visible":
-                    visibility_status = 1
-                else:
-                    visibility_status = 0
                 current_task = database.get_problem(id_of_task, connection)
-                current_task.visible = visibility_status
-                current_task.group = group
-                now = datetime.datetime.now()
-                timestamp = int(datetime.datetime.timestamp(now))
-                current_task.time_of = timestamp
-                bot.send_message(self.id, "Отправьте условие задачи.")
                 self.cur_Task = current_task
-                self._cmd_status = "updating_task"
+                self._cmd_status = "updating_of_visibility"
+                bot.send_message(self.id, "Вы хотите обновить видимость? Если нет - напишите No, в противном случае - новую видимость")
                 return
         if cmd == 'profile':
             bot.send_message(self.id, f'Имя: {self.name}\n'
@@ -503,7 +555,6 @@ class User:
                     visibility_status = str(cmd.split(" ")[2])
                     if visibility_status not in ["visible", "invisible"]:
                         bot.send_message(self.id, "Некорректный формат статуса")
-                        # bot.send_message(self.id, visibility_status)
                         return
                     else:
                         break
