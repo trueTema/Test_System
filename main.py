@@ -6,15 +6,20 @@ import users
 import threading
 
 
-def save_data(_signal, _frame):
-    """Saves data when the program is going to be closed"""
+def save_data():
     with open('Files/banned.json', 'w') as file:
         json.dump(list(users.banned_users), file)
+        file.close()
     cur = users.activity.head
     connection = users.get_connection(threading.current_thread().native_id)
     while cur is not None:
         database.update_user_info(cur.data[1], connection)
         cur = cur.next
+
+
+def signal_handler(_signal, _frame):
+    """Saves data when the program is going to be closed"""
+    save_data()
     exit(0)
 
 
@@ -37,7 +42,8 @@ def init():
 def main():
     """Main function of app"""
     cmd_list = ['help', 'start', 'report', 'send', 'profile', 'su', "adminLog", "adminHelp", "exit",
-                "addTask", "addScript", "deleteTask", "updateTask", "getTask", "status", "stats"
+                "addTask", "addScript", "deleteTask", "updateTask", "getTask", "status", "stats", "deleteParcel",
+                "getLog", "getUserList"
                 ]
 
     #  starting cleaning cache
@@ -54,9 +60,15 @@ def main():
             return
         cmd = message.text[1:]
 
-        connection = users.get_connection(threading.current_thread().native_id)
-        users.update_cache(user_id, connection)
-        users.cache[user_id].data[1].cmd_handler(cmd)
+        try:
+            connection = users.get_connection(threading.current_thread().native_id)
+            users.update_cache(user_id, connection)
+        except Exception as e:
+            print(f'Cache error: {e}')
+        try:
+            users.cache[user_id].data[1].cmd_handler(cmd)
+        except Exception as e:
+            print(f'Command handler error: {e}')
 
     @users.bot.message_handler(content_types=['text'])
     def receive_txt(message):
@@ -68,9 +80,16 @@ def main():
         if txt[0] == '/':  # Checking that the given text is not an attempt to enter a command
             users.bot.reply_to(message, "Неизвестная команда")
         else:
-            connection = users.get_connection(threading.current_thread().native_id)
-            users.update_cache(user_id, connection)
-            users.cache[user_id].data[1].txt_handler(txt)
+
+            try:
+                connection = users.get_connection(threading.current_thread().native_id)
+                users.update_cache(user_id, connection)
+            except Exception as e:
+                print(f'Cache error: {e}')
+            try:
+                users.cache[user_id].data[1].txt_handler(txt)
+            except Exception as e:
+                print(f'Text handler error: {e}')
 
     @users.bot.message_handler(content_types=['document'])
     def receive_doc(message):
@@ -89,17 +108,27 @@ def main():
             users.bot.reply_to(message, "Некорректный формат данных")
             return
         download = users.bot.download_file(file_info.file_path)
-        users.cache[user_id].data[1].doc_handler(download, type_of_file)
+        try:
+            connection = users.get_connection(threading.current_thread().native_id)
+            users.update_cache(user_id, connection)
+        except Exception as e:
+            print(f'Cache error: {e}')
+        try:
+            users.cache[user_id].data[1].doc_handler(download, type_of_file)
+        except Exception as e:
+            print(f'Document handler error: {e}')
         return
 
     users.bot.polling(non_stop=True)
 
 
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, save_data)
-    signal.signal(signal.SIGTERM, save_data)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     init()
     try:
         main()
     except Exception as e:
+        save_data()
         print(f'[Fatal system error]: {e}')
+        exit(0)

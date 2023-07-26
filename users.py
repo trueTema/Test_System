@@ -3,7 +3,6 @@ import json
 import os
 import sqlite3
 import time
-
 from telebot import types
 import run_checker
 import LinkedList
@@ -12,6 +11,8 @@ import telebot as tgbot
 from Task import TASK
 from Parcel import Parcel
 import threading
+from errors import errors
+from openpyxl import Workbook
 
 _token = json.load(open('Files/config.json', 'r'))["token"]
 bot = tgbot.TeleBot(_token)
@@ -22,7 +23,13 @@ statuses = {
     "super_user": 2
 }
 
+inf = 4133969999
+
 key_word = "8pJSSMgH7B"  # KeyWord for admin
+
+
+current_parcel_number = 1
+
 
 banned_users = set()
 """Blocked users"""
@@ -38,11 +45,12 @@ _help = "Список доступных команд:\n\n" \
         "profile - получить информацию о своём профиле\n" \
         "getTask <ID> - получить задачу по ID\n" \
         "\n===============\nКоманды для учителя:\n" \
-        "updateTask <ID> <visible/invisible> [Группа] - обновить задачу\n" \
-        "deleteTask <ID> - удалить задачку\n" \
-        "addTask <id> <visible\invisible> dd.MM.YYYY-HH:mm(Время дедлайна) [Группа] - добавить задачу\n" \
+        "updateTask <ID> - обновить задачу\n" \
+        "deleteTask <ID> - удалить задачу\n" \
+        "addTask <id> <open\hide> <best\last> [dd.MM.YYYY-HH:mm (Время дедлайна)] [Группа] - добавить задачу\n" \
         "exit - смена статуса на ученика\n" \
         "stats <ID> - получить статистику по задаче\n" \
+        "getLog <ID> - получить полный лог посылок по задаче\n" \
         "\n===============\nКоманды для суперпользователя:\n" \
         "ban <ID> - заблокировать пользователя\n" \
         "unban <ID> - разблокировать пользователя\n" \
@@ -114,6 +122,8 @@ class User:
         if self._cmd_status == 'updating_checking_script':
             if filetype != 'py':
                 bot.send_message(self.id, 'Скрипт должен быть формата .py')
+                self.cur_Task = None
+                self._cmd_status = ''
                 return
             os.remove(f'Scripts/{self.cur_Task.id}.py')
             src = f"Scripts/{str(self.cur_Task.id)}.py"
@@ -144,43 +154,15 @@ class User:
             if database.get_problem(self.cur_task_id,
                                     get_connection(threading.current_thread().native_id)).visible == 1:
                 bot.send_message(self.id, f'Набрано баллов: {checker_result["points"]}')
+
             current_parcell = Parcel(points=checker_result["points"],
                                      date=timestamp, id_user=self.id, id_task=self.cur_task_id,
-                                     answer=str(file))
+                                     answer=run_checker.bytes_to_str(file), id=int(str(self.id)[1::3] + str(now)[-6:]))
             connection = get_connection(threading.current_thread().native_id)
             database.add_parcel(current_parcell, connection)  # Sending parcell
             self.cur_Task = None
             self._cmd_status = None
             bot.send_message(self.id, "Посылка была отправлена")
-            return
-        if self._cmd_status == "updating_parcell":
-            if filetype != 'txt':
-                bot.send_message(self.id, 'Посылкой может быть только текстовый файл.')
-                return
-            now = datetime.datetime.now()
-            timestamp = int(datetime.datetime.timestamp(now))
-            try:
-                checker_result = run_checker.get_points(f'Scripts/{self.cur_task_id}.py',
-                                                        run_checker.bytes_to_str(file))
-            except Exception as e:
-                bot.send_message(self.id, 'Нетестируемый ответ.')
-                return
-            if len(checker_result["errors"]) != 0:
-                bot.send_message(self.id, 'Нетестируемый ответ.')
-                return
-
-            current_parcell = Parcel(points=checker_result["points"], date=timestamp, id_user=self.id,
-                                     id_task=self.cur_task_id,
-                                     answer=str(file))
-            connection = get_connection(threading.current_thread().native_id)
-            database.update_parcel(current_parcell, connection)  # Updating parcell
-            if database.get_problem(self.cur_task_id,
-                                    get_connection(threading.current_thread().native_id)).visible == 1:
-                bot.send_message(self.id, f'Посылка была отправлена. \nНабрано баллов: {checker_result["points"]}')
-            else:
-                bot.send_message(self.id, "Посылка была отправлена.")
-            self.cur_Task = None
-            self._cmd_status = None
             return
 
     def txt_handler(self, txt: str):
@@ -202,6 +184,33 @@ class User:
             bot.send_message(self.id, 'Введите учебную группу: ')
             self._cmd_status = "register_r_study_g"
             return
+        if self._cmd_status == "pushing_parcel":
+            now = datetime.datetime.now()
+            timestamp = int(datetime.datetime.timestamp(now))
+            try:
+                checker_result = run_checker.get_points(f'Scripts/{self.cur_task_id}.py',
+                                                        txt)
+            except Exception as e:
+                bot.send_message(self.id, 'Нетестируемый ответ.')
+                self._cmd_status = ""
+                return
+            if len(checker_result["errors"]) != 0:
+                bot.send_message(self.id, checker_result["errors"])
+                self._cmd_status = ""
+                return
+            if database.get_problem(self.cur_task_id,
+                                    get_connection(threading.current_thread().native_id)).visible == 1:
+                bot.send_message(self.id, f'Набрано баллов: {checker_result["points"]}')
+
+            current_parcell = Parcel(points=checker_result["points"],
+                                     date=timestamp, id_user=self.id, id_task=self.cur_task_id,
+                                     answer=txt, id=int(str(self.id)[1::3] + str(now)[-6:]))
+            connection = get_connection(threading.current_thread().native_id)
+            database.add_parcel(current_parcell, connection)  # Sending parcell
+            self.cur_Task = None
+            self._cmd_status = None
+            bot.send_message(self.id, "Посылка была отправлена")
+            return
         if self._cmd_status == "register_r_study_g":
             self.study_group = txt
             bot.send_message(self.id, f'Регистрация успешно завершена. Добро пожаловать, {self.name}!')
@@ -218,23 +227,45 @@ class User:
             self._cmd_status = 'pushing_checking_script'
             bot.send_message(self.id, 'Отправьте скрипт проверки для этой задачи.')
             return
-
-        if self._cmd_status == "updating_of_visibility":
+        if self._cmd_status == "updating_checker_status":
             field_text = txt
-            new_visible = 0
             if field_text == "No":
                 self._cmd_status = "updating_of_deadline"
                 bot.send_message(self.id,
                                  "Вы хотите обновить дату дедлайна? Если нет - напишите No, в противном случае - новую дату")
                 return
-            elif field_text == "visible":
-                new_visible = 1
+            elif field_text == "last":
+                new_status = 1
+            elif field_text == 'best':
+                new_status = 0
             else:
-                new_visible = 0
-            self.cur_Task.visible = new_visible
+                bot.send_message(self.id, 'Некорректный формат параметра видимости результата посылки.')
+                self._cmd_status = ""
+                return
+            self.cur_Task.best_or_last = new_status
             self._cmd_status = "updating_of_deadline"
             bot.send_message(self.id,
                              "Вы хотите обновить дату дедлайна? Если нет - напишите No, в противном случае - новую дату")
+            return
+        if self._cmd_status == "updating_of_visibility":
+            field_text = txt
+            if field_text == "No":
+                self._cmd_status = "updating_checker_status"
+                bot.send_message(self.id,
+                                 "Вы хотите обновить статус чекера? Если нет - напишите No, в противном случае - новый статус")
+                return
+            elif field_text == "open":
+                new_visible = 1
+            elif field_text == 'hide':
+                new_visible = 0
+            else:
+                bot.send_message(self.id, 'Некорректный формат параметра видимости результата посылки.')
+                self._cmd_status = ""
+                return
+            self.cur_Task.visible = new_visible
+            self._cmd_status = "updating_of_deadline"
+            bot.send_message(self.id,
+                             "Вы хотите обновить статус чекера? Если нет - напишите No, в противном случае - новый статус")
             return
 
         if self._cmd_status == "updating_of_deadline":
@@ -245,10 +276,14 @@ class User:
                 self._cmd_status="updating_of_group"
                 return
             else:
-                date_of_death = datetime.datetime.strptime(field_text, "%d.%m.%Y-%H:%M")
+                if field_text == '_':
+                    date_of_death = datetime.datetime.fromtimestamp(inf)
+                else:
+                    date_of_death = datetime.datetime.strptime(field_text, "%d.%m.%Y-%H:%M")
                 now = datetime.datetime.now()
                 if now > date_of_death:
                     bot.send_message(self.id, "Вы пытаетесь установить невозможный дедлайн")
+                    self._cmd_status = ""
                     return
                 else:
                     timestamp_sec = int(datetime.datetime.timestamp(date_of_death))
@@ -260,27 +295,23 @@ class User:
 
         if self._cmd_status == "updating_of_group":
             field_text = txt
+            bot.send_message(self.id,
+                             "Вы хотите обновить условие задачи? Если нет - напишите No, в противном случае - новое условие")
+            self._cmd_status = "updating_of_statement"
             if field_text == 'No':
-                bot.send_message(self.id,"Вы хотите обновить условие задачи? Если нет - напишите No, в противном случае - новое условие")
-                self._cmd_status = "updating_of_statement"
                 return
-            else:
-                self.cur_Task.group=field_text
-                bot.send_message(self.id, "Вы хотите обновить условие задачи? Если нет - напишите No, в противном случае - новое условие")
-                self._cmd_status = "updating_of_statement"
-                return
+            self.cur_Task.group=field_text
+            return
 
         if self._cmd_status == "updating_of_statement":
             field_text = txt
+            bot.send_message(self.id, "Вы хотите обновить скрипт проверки? Если нет - "
+                                      "напишите No, в противном случае - Yes. ")
+            self._cmd_status = "updating_checking_script_answer"
             if field_text == 'No':
-                bot.send_message(self.id,"Вы хотите обновить скрипт проверки? Если нет - напишите No, в противном случае - прикрепите новый скрипт")
-                self._cmd_status = "updating_checking_script_answer"
                 return
-            else:
-                self.cur_Task.statement = field_text
-                bot.send_message(self.id, "Вы хотите обновить скрипт проверки? Если нет - напишите No, в противном случае - прикрепите новый скрипт")
-                self._cmd_status = "updating_checking_script_answer"
-                return
+            self.cur_Task.statement = field_text
+            return
         if self._cmd_status == "updating_checking_script_answer":
             field_text = txt
             if field_text == 'No':
@@ -290,12 +321,14 @@ class User:
                 self.cur_Task = None
                 self._cmd_status = None
                 return
-            else:
+            elif field_text == 'Yes':
+                bot.send_message(self.id, 'Отправьте новый скрипт.')
                 self._cmd_status = "updating_checking_script"
                 return
-
-
-
+            else:
+                self.cur_Task = None
+                self._cmd_status = None
+                return
 
     def super_user_cmd(self, cmd: str):
         """
@@ -362,7 +395,7 @@ class User:
                 return
             try:
                 user_id = int(cmd[1])
-            except ...:
+            except Exception as e:
                 bot.send_message(self.id, 'Некорректный формат команды.')
                 return
             if user_id in cache.keys():
@@ -411,6 +444,46 @@ class User:
                 return
             self.super_user_cmd(cmd[3:])
             return
+        if cmd[:6] == 'getLog':
+            cmd = cmd.split()[1:]
+            if len(cmd) != 1:
+                bot.send_message(self.id, errors["IncorrectFormat"])
+                return
+            task_id = int(cmd[0])
+            connection = get_connection(threading.current_thread().native_id)
+            cur_task = database.get_problem(task_id, connection)
+            if cur_task is None:
+                bot.send_message(self.id, errors["IDNotFound"])
+                return
+            if (self.status == 'teacher' and self.id != cur_task.id_of_user) or (self.status == 'student'):
+                bot.send_message(self.id, errors["AccessError"])
+                return
+            parcels_list = database.get_problem_parcels(task_id, connection)
+            if len(parcels_list) == 0:
+                bot.send_message(self.id, 'По этой задаче ещё не было посылок.')
+                return
+            wb = Workbook()
+
+            active_sheet = wb.active
+            active_sheet.append(["Время отправки", "ID посылки", "ID отправителя", "ФИ отправителя", "Ответ", "Баллы"])
+            for line in parcels_list:
+                user = database.get_user(line.id_user, connection)
+                active_sheet.append([str(datetime.datetime.utcfromtimestamp(line.date + 3*60*60).strftime('%Y-%m-%d %H:%M:%S')),
+                           line.id, line.id_user, str(user.name), str(line.answer).encode(), line.points])
+            wb.save(f'Files/TABLE_{task_id}.xlsx')
+            wb.close()
+            with open(f"Files/TABLE_{task_id}.xlsx", "rb") as misc:
+                bot.send_message(self.id, 'Таблица успешно создана.')
+                bot.send_document(self.id, misc)
+            os.remove(f'Files/TABLE_{task_id}.xlsx')
+            return
+        if cmd == 'getUserList':
+            cmd = cmd.split()
+            if len(cmd) != 0:
+                bot.send_message(self.id, 'Некорректный формат команды.')
+                return
+
+            return
         if cmd == 'start':
             if self.name != '':
                 bot.send_message(self.id, "Вы уже зарегистрированы.", reply_markup=kb)
@@ -426,31 +499,25 @@ class User:
             return
         if cmd[:4] == 'send':
             if len(cmd.split(" ")) != 2:
-                bot.send_message(self.id, "Вы не ввели айди номера или сделали это неправильно ")
+                bot.send_message(self.id, "Вы не ввели айди задачи или сделали это неправильно ")
                 return
             id_of_parcell = int(cmd.split(" ")[1])
             connection = get_connection(threading.current_thread().native_id)
             if database.get_problem(id_of_parcell, connection) is None:
-                bot.send_message(self.id, "Вы пытаетесь отправить решение для несуещствующей задачи")
+                bot.send_message(self.id, "Вы пытаетесь отправить решение для несуществующей задачи")
                 return
             now = datetime.datetime.now()
             chosen_task = database.get_problem(id_of_parcell, connection)
-            time_of_task =  datetime.datetime.fromtimestamp(chosen_task.deadline)
-            if (time_of_task < now):
-                bot.send_message(self.id, "Ответы для данной задачи уже не принимаются")
+            time_of_task = datetime.datetime.fromtimestamp(chosen_task.deadline)
+            if time_of_task < now:
+                bot.send_message(self.id, "Ответы для данной задачи не принимаются")
                 return
-            list_of_parcels = database.get_user_problem_parcels(self.id, id_of_parcell, connection)
-            if len(list_of_parcels) == 0:
-                self._cmd_status = "pushing_parcel"
-                self.cur_task_id = id_of_parcell
-                bot.send_message(self.id, "Отправьте файл с ответом.", reply_markup=kb)
-            else:
-                self._cmd_status = "updating_parcell"
-                self.cur_task_id = id_of_parcell
-                bot.send_message(self.id, "Отправьте файл с ответом.")
+            self._cmd_status = "pushing_parcel"
+            self.cur_task_id = id_of_parcell
+            bot.send_message(self.id, "Отправьте файл с ответом.", reply_markup=kb)
             return
         if cmd[:8] == "adminLog":  # Login as admin
-            if statuses[self.status] > 0 :
+            if statuses[self.status] == 2:
                 bot.send_message(self.id,"Вы уже имеете статус учителя")
                 return
             if str(cmd[9:]) != "" and str(cmd[9:]) == key_word:  # !!! The key_word has to be right !!!
@@ -513,10 +580,11 @@ class User:
                         bot.send_message(self.id, "Ошибка доступа.")
                         return
                     database.delete_problem(id_of_task, connection)
+                    os.remove(f'Scripts/{id_of_task}.py')
                     bot.send_message(self.id, f"Задача под индексом {id_of_task} была удалена")
                     return
                 else:
-                    bot.send_message(self.id, "Данной команды нет в базе данных")
+                    bot.send_message(self.id, "Такой задачи не найдено.")
                     return
             else:
                 bot.send_message(self.id, "Ошибка доступа.")
@@ -544,72 +612,131 @@ class User:
                 date = datetime.datetime.utcfromtimestamp(parcels_list[i].date).strftime('%Y-%m-%d %H:%M:%S')
                 res += f'[{i + 1}]' + ' ' + f'{parcels_list[i].points if is_visible else "Баллы скрыты"}' + ' ' + f'{date}\n'
             bot.send_message(self.id, res)
-
-        if cmd[:7] == "addTask":
-            if self.status == "teacher" or self.status == "super_user":
-                connection = get_connection(threading.current_thread().native_id)
-                if len(cmd.split(" ")) not in (4, 5):
-                    bot.send_message(self.id, "Комнда должна быть в виде: /addTask <ID> <visible/visible> dd.mm.YYYY-HH:MM [group] ")
-                    return
-                while True:
-                    visibility_status = str(cmd.split(" ")[2])
-                    if visibility_status not in ["visible", "invisible"]:
-                        bot.send_message(self.id, "Некорректный формат статуса")
-                        return
-                    else:
-                        break
-                id_of = int(str(cmd.split(" ")[1]))
-                string_of_date = str(cmd.split(" ")[3])
-                date_of_death = datetime.datetime.strptime(string_of_date, "%d.%m.%Y-%H:%M")
-                timestamp_sec = int(datetime.datetime.timestamp(date_of_death))
-                now = datetime.datetime.now()
-                if now > date_of_death:
-                    bot.send_message(self.id, "Вы пытаетесь установить невозможный дедлайн")
-                    return
-                timestamp = int(datetime.datetime.timestamp(now))
-                if len(cmd.split()) < 5:
-                    group = "None"
-                else:
-                    group = cmd.split()[4]
-                if visibility_status == "visible":
-                    visibility_status = 1
-                else:
-                    visibility_status = 0
-                cur_task = database.get_problem(id_of, connection)
-                if cur_task is not None:
-                    bot.send_message(self.id, 'Данная задача уже существует.')
-                    return
-                bot.send_message(self.id, "Отправьте условие задачи.")
-                self._cmd_status = "admin_pulling_task"
-                new_one = TASK(id_of, visibility_status, group=group, time_of=timestamp, id_of_user=self.id, deadline=timestamp_sec)
-                self.cur_Task = new_one
+        if cmd[:12] == 'deleteParcel':
+            if not(self.status == 'teacher' or self.status == 'super_user'):
+                bot.send_message(self.id, 'Ошибка доступа.')
                 return
+            if len(cmd.split()) != 2:
+                bot.send_message(self.id, 'Некорректный формат команды')
+                return
+            parcel_id = int(cmd.split()[-1])
+            connection = get_connection(threading.current_thread().native_id)
+            parcel = database.get_parcel_by_id(parcel_id, connection)
+            if parcel is None:
+                bot.send_message(self.id, 'Посылка с таким ID не найдена.')
+                return
+            teacher_id = database.get_problem(parcel.id_task, connection).id_of_user
+            if self.id != teacher_id and self.status == "teacher":
+                bot.send_message(self.id, 'Ошибка доступа.')
+                return
+            database.delete_parcel(parcel_id, connection)
+            bot.send_message(self.id, 'Посылка успешно удалена')
+        if cmd[:7] == "addTask":
+            if self.status == 'student':
+                bot.send_message(self.id, 'Ошибка доступа.')
+                return
+            cmd = cmd.split()[1:]
+            try:
+                id = int(cmd[0])
+            except Exception as e:
+                bot.send_message(self.id, 'Некорректный ID задачи.')
+                return
+            if len(cmd) < 2:
+                bot.send_message(self.id, 'Отсутствует параметр видимости результата посылки.')
+                return
+            if cmd[1] == 'open':
+                visibility_status = 1
+            elif cmd[1] == 'hide':
+                visibility_status = 0
             else:
-                bot.send_message(self.id, "Ошибка доступа.")
+                bot.send_message(self.id, 'Некорректный параметр видимости результата посылки.')
+                return
+            if len(cmd) < 3:
+                bot.send_message(self.id, 'Отсутствует параметр статуса чекера.')
+                return
+            if cmd[2] == 'best':
+                checker_status = 0
+            elif cmd[2] == 'last':
+                checker_status = 1
+            else:
+                bot.send_message(self.id, 'Некорректный параметр статуса чекера.')
+                return
+            deadline = inf
+            if len(cmd) > 3:
+                string_of_date = str(cmd[3])
+                if string_of_date != '_':
+                    try:
+                        date_of_death = datetime.datetime.strptime(string_of_date, "%d.%m.%Y-%H:%M")
+                    except Exception as e:
+                        bot.send_message(self.id, "Некорректный формат дедлайна.")
+                        return
+                    now = datetime.datetime.now()
+                    if now > date_of_death:
+                        bot.send_message(self.id, "Вы пытаетесь установить невозможный дедлайн")
+                        return
+                    deadline = int(datetime.datetime.timestamp(date_of_death))
+
+            group = "None"
+            if len(cmd) > 4 and cmd[4] != '_':
+                group = cmd[4]
+            connection = get_connection(threading.current_thread().native_id)
+            cur_task = database.get_problem(id, connection)
+            if cur_task is not None:
+                bot.send_message(self.id, 'Данная задача уже существует.')
+                return
+            bot.send_message(self.id, "Отправьте условие задачи.")
+            self._cmd_status = "admin_pulling_task"
+            new_one = TASK(id=id, visible=visibility_status, group=group, id_of_user=self.id, deadline=deadline,
+                           best_or_last=checker_status)
+            self.cur_Task = new_one
+            return
         if cmd[:5] == "stats":
             if statuses[self.status] == 0:
                 bot.send_message(self.id, "Ошибка доступа.")
                 return
             connection = get_connection(threading.current_thread().native_id)
-            id_of_task = int(cmd.split(" ")[1])
+            try:
+                id_of_task = int(cmd.split(" ")[1])
+            except Exception as e:
+                bot.send_message(self.id, 'Некорректный формат команды.')
+                return
             problem = database.get_problem(id_of_task, connection)
+            if problem is None:
+                bot.send_message(self.id, 'Задача не найдена.')
+                return
             if self.status == 'teacher' and problem.id_of_user != self.id:
                 bot.send_message(self.id, "Ошибка доступа.")
-            list_of_chosen_id = database.get_problem_parcels(id_of_task, connection)
-            if len(list_of_chosen_id) == 0:
+            parcels_list = database.get_problem_parcels(id_of_task, connection)
+            if len(parcels_list) == 0:
                 bot.send_message(self.id, "Для данной задачи не было отправлено ни одного решения")
                 return
-            list_of_chosen_id.sort(key=lambda parcel: [parcel.points, 1**18 - parcel.date], reverse=True)
-            string_of_exit = ""
-            for j in list_of_chosen_id:
-                id_of_user = j.id_user  # What is the problem?
-                if id_of_user in cache.keys():
-                    cur_user = cache[id_of_user].data[1]
-                else:
-                    cur_user = database.get_user(id_of_user, connection)
-                string_of_exit += f"ID пользователя: {id_of_user} \nИмя: {cur_user.name} \nПолученные баллы {j.points} \
-                \nВремя отправки: {datetime.datetime.utcfromtimestamp(j.date).strftime('%Y-%m-%d %H:%M:%S')}\n====================\n"
-            bot.send_message(self.id, string_of_exit)
+            if problem.best_or_last == 0:
+                parcels_list.sort(key=lambda x: [x.id_user, inf - x.points])
+            else:
+                parcels_list.sort(key=lambda x: [x.id_user, inf - x.date])
+
+            list_of_chosen_id = [parcels_list[0]]
+
+            for i in range(1, len(parcels_list)):
+                if parcels_list[i].id_user != parcels_list[i - 1].id_user:
+                    list_of_chosen_id += [parcels_list[i]]
+            list_of_chosen_id.sort(key=lambda parcel: [parcel.points, inf - parcel.date], reverse=True)
+            wb = Workbook()
+
+            active_sheet = wb.active
+            active_sheet.append(["Время отправки", "ID посылки", "ID отправителя", "ФИ отправителя", "Ответ", "Баллы"])
+            for line in list_of_chosen_id:
+                user = database.get_user(line.id_user, connection)
+                active_sheet.append(
+                    [str(datetime.datetime.utcfromtimestamp(line.date + 3 * 60 * 60).strftime('%Y-%m-%d %H:%M:%S')),
+                     line.id, line.id_user, str(user.name), str(line.answer).encode(), line.points])
+            wb.save(f'Files/TABLE_{id_of_task}.xlsx')
+            wb.close()
+            with open(f"Files/TABLE_{id_of_task}.xlsx", "rb") as misc:
+                bot.send_message(self.id, 'Таблица успешно создана.')
+                bot.send_document(self.id, misc)
+
+            os.remove(f'Files/TABLE_{id_of_task}.xlsx')
             return
         if cmd[:7] == 'getTask':
             cmd = cmd.split()[1:]
@@ -625,8 +752,14 @@ class User:
             if (cur_task.id_of_user != self.id and cur_task.group != self.study_group and self.status != 'super_user') and cur_task.group != "None":
                 bot.send_message(self.id, 'Отказано в доступе.')
                 return
+            deadline_str = "Не ограничено."
+            if cur_task.deadline != float(inf):
+                deadline_str = datetime.datetime.utcfromtimestamp(cur_task.deadline + 3*60*60).strftime("%d-%m-%Y %H:%M:%S")
             bot.send_message(self.id, f'ID: {cur_task.id}\nУсловие: {cur_task.statement}'
-                                      f'\nГруппа: {"Публичная" if cur_task.group == "None" else cur_task.group}')
+                                      f'\nГруппа: {"Публичная" if cur_task.group == "None" else cur_task.group}'
+                                      f'\nВидимость посылки: {"Открытая" if cur_task.visible else "Скрытая"}'
+                                      f'\nЗасчитываемый результат: {"Лучший" if cur_task.best_or_last == 0 else "Последний"}'
+                                      f'\nСрок завершения: {deadline_str}')
 
 
 activity = LinkedList.LinkedList()

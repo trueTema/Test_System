@@ -9,8 +9,9 @@ parcels (
     problem_ID int primary key
     student_ID int check(student_ID > 0) not null
     points float not null
-    any_info text not null
+    answer text not null
     sending_time big_int check(sending_time > 0)
+    ID int check(ID > 0) unique not null
 )
 
 problems (
@@ -18,6 +19,7 @@ problems (
     teacher_ID int not null check(teacher_ID > 0)
     problem_situation text
     is_visible int check(is_visible in (0, 1)) default 1
+    best_or_last int check(best_or_last in (0, 1)) default 1
     deadline int check(deadline > 0)
     users_group varchar(32)
 )
