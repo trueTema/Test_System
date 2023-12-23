@@ -1,10 +1,40 @@
 import sqlite3
+import time
+
 import users
 import Task
 from Task import TASK
 from Parcel import Parcel
 
 
+max_timeout = 5
+"""Maximum time of waiting of request answer in seconds"""
+database_usage = False
+"""Indicator that shows if the database is used by any request"""
+
+
+def retry(function):
+    """
+    Retry decorator for requests to database
+    :param function: request to database
+    :return: decorator
+    """
+    def _wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        global database_usage
+        while True:
+            cur_time = time.perf_counter()
+            if cur_time - start_time >= max_timeout:
+                raise Exception(f'Timeout {max_timeout} seconds error')
+            if not database_usage:
+                database_usage = True
+                result = function(*args, **kwargs)
+                database_usage = False
+                return result
+    return _wrapper
+
+
+@retry
 def add_parcel(parcel: Parcel, connection: sqlite3.Connection):
     """
     Adds parcel to the database
@@ -16,6 +46,7 @@ def add_parcel(parcel: Parcel, connection: sqlite3.Connection):
         cur.execute("insert into parcels(problem_ID, student_ID, points, answer, sending_time, ID) "
                     f"values({parcel.id_task}, {parcel.id_user}, {parcel.points}, \"{parcel.answer}\", {parcel.date}, "
                     f"{parcel.id});")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new parcel to database {e} has occurred.')
@@ -23,6 +54,7 @@ def add_parcel(parcel: Parcel, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def delete_parcel(parcel_id: int, connection: sqlite3.Connection):
     """
     Deletes parcel from database
@@ -33,6 +65,7 @@ def delete_parcel(parcel_id: int, connection: sqlite3.Connection):
     try:
         cur.execute(f"delete from parcels "
                     f"where ID = {parcel_id};")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While deleting a parcel from database {e} has occurred.')
@@ -40,6 +73,7 @@ def delete_parcel(parcel_id: int, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def get_parcel_by_id(id: int, connection: sqlite3.Connection):
     """
     Finds the parcel by its id
@@ -51,6 +85,7 @@ def get_parcel_by_id(id: int, connection: sqlite3.Connection):
     try:
         cur.execute(f"SELECT * from parcels where ID = {id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return None
         res = res[0]
@@ -62,6 +97,7 @@ def get_parcel_by_id(id: int, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def add_problem(problem: TASK, connection: sqlite3.Connection):
     """
     Adds problem into database
@@ -74,6 +110,7 @@ def add_problem(problem: TASK, connection: sqlite3.Connection):
                     "deadline, best_or_last) "
                     f"values({problem.id}, {problem.id_of_user}, \"{problem.statement}\", {problem.visible}, "
                     f"\"{problem.group}\", \"{problem.deadline}\", \"{problem.best_or_last}\");")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new problem {e} has occurred.')
@@ -81,6 +118,7 @@ def add_problem(problem: TASK, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
     """
     Returns TASK by ID of problem
@@ -92,6 +130,7 @@ def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
     try:
         cur.execute(f"select * from problems where problem_ID = {id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return None
         res_task = TASK(id=res[0][0], visible=res[0][3], id_of_user=res[0][1], statement=res[0][2], group=res[0][6],
@@ -103,6 +142,7 @@ def get_problem(id: int, connection: sqlite3.Connection) -> Task.TASK or None:
         cur.close()
 
 
+@retry
 def update_problem(problem: TASK, connection: sqlite3.Connection):
     """
     Updates info about problem in database
@@ -118,6 +158,7 @@ def update_problem(problem: TASK, connection: sqlite3.Connection):
                     f"deadline = \"{problem.deadline}\", "
                     f"best_or_last = {problem.best_or_last} "
                     f"where problem_ID = {problem.id};")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While updating a problem in database {e} has occurred.')
@@ -125,6 +166,7 @@ def update_problem(problem: TASK, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def delete_problem(problem_id: int, connection: sqlite3.Connection):
     """
     Deletes problem from database
@@ -137,6 +179,7 @@ def delete_problem(problem_id: int, connection: sqlite3.Connection):
                     f"where problem_ID = {problem_id};")
         cur.execute(f"delete from parcels "
                     f"where problem_ID = {problem_id}")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While deleting an user from database {e} has occurred.')
@@ -144,6 +187,7 @@ def delete_problem(problem_id: int, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def add_user(user: users.User, connection: sqlite3.Connection):
     """
     Adds user into database
@@ -154,6 +198,7 @@ def add_user(user: users.User, connection: sqlite3.Connection):
     try:
         cur.execute(f"INSERT INTO users(id, name, status, study_group) "
                     f"values({user.id}, \"{user.name}\", \"{user.status}\", \"{user.study_group}\");")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new parcel to database {e} has occurred.')
@@ -161,6 +206,7 @@ def add_user(user: users.User, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def update_user_info(user: users.User, connection: sqlite3.Connection):
     """
     Updates info about user in database
@@ -174,6 +220,7 @@ def update_user_info(user: users.User, connection: sqlite3.Connection):
                     f"status = \"{user.status}\","
                     f"study_group = \"{user.study_group}\""
                     f"where id = {user.id};")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While adding a new parcel to database {e} has occurred.')
@@ -181,6 +228,7 @@ def update_user_info(user: users.User, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def get_user(id: int, connection: sqlite3.Connection) -> users.User or None:
     """
     Find info about user in database and returns it.
@@ -192,6 +240,7 @@ def get_user(id: int, connection: sqlite3.Connection) -> users.User or None:
     try:
         cur.execute(f"SELECT * FROM users where id = {id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return None
         result = users.User(id=res[0][0], name=res[0][1], status=res[0][2], study_group=res[0][3])
@@ -202,6 +251,7 @@ def get_user(id: int, connection: sqlite3.Connection) -> users.User or None:
         cur.close()
 
 
+@retry
 def del_user(user: users.User, connection: sqlite3.Connection):
     """
     Deletes information about user from database
@@ -212,6 +262,7 @@ def del_user(user: users.User, connection: sqlite3.Connection):
     try:
         cur.execute(f"DELETE * from users"
                     f"where id = {user.id};")
+        cur.close()
         connection.commit()
     except Exception as e:
         print(f'[Error] While deleting an user from database {e} has occurred.')
@@ -219,6 +270,7 @@ def del_user(user: users.User, connection: sqlite3.Connection):
         cur.close()
 
 
+@retry
 def get_user_list(connection: sqlite3.Connection) -> list[users.User]:
     """
     Returns a full list of registered users
@@ -229,6 +281,7 @@ def get_user_list(connection: sqlite3.Connection) -> list[users.User]:
     try:
         cur.execute(f"select * from users;")
         result = cur.fetchall()
+        cur.close()
         if len(result) == 0:
             return result
         result = list(map(lambda sql_obj: users.User(id=int(sql_obj[0]), name=sql_obj[1], status=sql_obj[2],
@@ -241,6 +294,7 @@ def get_user_list(connection: sqlite3.Connection) -> list[users.User]:
 
 
 #  special functions
+@retry
 def get_user_parcels(user_id: int, connection: sqlite3.Connection) -> list:
     """
     Returns a list of parcels that have been sent by this user.
@@ -253,6 +307,7 @@ def get_user_parcels(user_id: int, connection: sqlite3.Connection) -> list:
         cur.execute(f"select * from parcels "
                     f"where student_ID = {user_id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return res
         res = list(map(lambda x: Parcel(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4], id=x[5]), res))
@@ -263,6 +318,7 @@ def get_user_parcels(user_id: int, connection: sqlite3.Connection) -> list:
         cur.close()
 
 
+@retry
 def get_user_problem_parcels(user_id: int, problem_id: int, connection: sqlite3.Connection) -> list:
     """
     Returns a list of parcels that have been sent by this user.
@@ -277,6 +333,7 @@ def get_user_problem_parcels(user_id: int, problem_id: int, connection: sqlite3.
         cur.execute(f"select * from parcels "
                     f"where student_ID = {user_id} and problem_ID = {problem_id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return res
         res = list(map(lambda x: Parcel(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4], id=x[5]), res))
@@ -287,6 +344,7 @@ def get_user_problem_parcels(user_id: int, problem_id: int, connection: sqlite3.
         cur.close()
 
 
+@retry
 def get_problem_parcels(problem_id: int, connection: sqlite3.Connection) -> list:
     """
     Returns a list of parcels that have been sent for this problem.
@@ -299,6 +357,7 @@ def get_problem_parcels(problem_id: int, connection: sqlite3.Connection) -> list
         cur.execute(f"select * from parcels "
                     f"where problem_ID = {problem_id};")
         res = cur.fetchall()
+        cur.close()
         if len(res) == 0:
             return res
         res = list(map(lambda x: Parcel(id_user=x[1], id_task=x[0], points=x[2], answer=x[3], date=x[4], id=x[5]), res))

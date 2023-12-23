@@ -389,6 +389,26 @@ class User:
                     return
                 cache[user_id].data[1].study_group = new_group
             return
+        if cmd[0] == 'getUserList':
+            if len(cmd) != 1:
+                bot.send_message(self.id, 'Некорректный формат команды.')
+                return
+
+            user_list = database.get_user_list(get_connection(threading.current_thread().native_id))
+            wb = Workbook()
+
+            active_sheet = wb.active
+            active_sheet.append(["ID пользователя", "ФИ", "Статус", "Учебная группа"])
+            for line in user_list:
+                active_sheet.append(
+                    [line.id, line.name, line.status, line.study_group])
+            wb.save(f'Files/USER_LIST.xlsx')
+            wb.close()
+            with open(f"Files/USER_LIST.xlsx", "rb") as misc:
+                bot.send_message(self.id, 'Таблица успешно создана.')
+                bot.send_document(self.id, misc)
+            os.remove(f'Files/USER_LIST.xlsx')
+            return
         if cmd[0] == 'ban':
             if len(cmd) > 2:
                 bot.send_message(self.id, 'Некорректный формат команды.')
@@ -470,19 +490,12 @@ class User:
                 user = database.get_user(line.id_user, connection)
                 active_sheet.append([str(datetime.datetime.utcfromtimestamp(line.date + 3*60*60).strftime('%Y-%m-%d %H:%M:%S')),
                            line.id, line.id_user, str(user.name), str(line.answer).encode(), line.points])
-            wb.save(f'Files/TABLE_{task_id}.xlsx')
+            wb.save(f'Files/LOG_{task_id}.xlsx')
             wb.close()
-            with open(f"Files/TABLE_{task_id}.xlsx", "rb") as misc:
+            with open(f"Files/LOG_{task_id}.xlsx", "rb") as misc:
                 bot.send_message(self.id, 'Таблица успешно создана.')
                 bot.send_document(self.id, misc)
-            os.remove(f'Files/TABLE_{task_id}.xlsx')
-            return
-        if cmd == 'getUserList':
-            cmd = cmd.split()
-            if len(cmd) != 0:
-                bot.send_message(self.id, 'Некорректный формат команды.')
-                return
-
+            os.remove(f'Files/LOG_{task_id}.xlsx')
             return
         if cmd == 'start':
             if self.name != '':
@@ -730,13 +743,13 @@ class User:
                 active_sheet.append(
                     [str(datetime.datetime.utcfromtimestamp(line.date + 3 * 60 * 60).strftime('%Y-%m-%d %H:%M:%S')),
                      line.id, line.id_user, str(user.name), str(line.answer).encode(), line.points])
-            wb.save(f'Files/TABLE_{id_of_task}.xlsx')
+            wb.save(f'Files/STATS_{id_of_task}.xlsx')
             wb.close()
-            with open(f"Files/TABLE_{id_of_task}.xlsx", "rb") as misc:
+            with open(f"Files/STATS_{id_of_task}.xlsx", "rb") as misc:
                 bot.send_message(self.id, 'Таблица успешно создана.')
                 bot.send_document(self.id, misc)
 
-            os.remove(f'Files/TABLE_{id_of_task}.xlsx')
+            os.remove(f'Files/STATS_{id_of_task}.xlsx')
             return
         if cmd[:7] == 'getTask':
             cmd = cmd.split()[1:]
